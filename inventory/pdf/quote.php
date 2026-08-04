@@ -128,7 +128,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
 
     <div class="addresses">
         <div class="address-block">
-            <div class="address-label">Bill To</div>
+            <div class="address-label">Prepared For</div>
             <div class="name"><?= h($quote['customer_name']) ?></div>
             <?php if ($quote['company']): ?><div><?= h($quote['company']) ?></div><?php endif; ?>
             <?php if ($quote['email']): ?><div><?= h($quote['email']) ?></div><?php endif; ?>
