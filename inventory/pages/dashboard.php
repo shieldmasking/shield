@@ -17,7 +17,7 @@ $open_orders   = $db->query('SELECT COUNT(*) FROM orders WHERE qb_invoice_id IS 
 
 // Recent quotes
 $recent_quotes = $db->query('
-    SELECT q.id, q.quote_number, q.status, q.created_at, c.name AS customer_name
+    SELECT q.id, q.quote_number, q.status, q.created_at, c.name AS customer_name, c.company
     FROM quotes q
     JOIN customers c ON c.id = q.customer_id
     ORDER BY q.created_at DESC
@@ -90,7 +90,7 @@ render_header('Dashboard', 'dashboard');
             <?php foreach ($recent_quotes as $q): ?>
             <tr>
                 <td>#<?= (int)$q['quote_number'] ?></td>
-                <td><?= h($q['customer_name']) ?></td>
+                <td><?= h($q['customer_name']) ?><?php if ($q['company']): ?><br><small class="text-muted"><?= h($q['company']) ?></small><?php endif; ?></td>
                 <td><span class="badge badge-<?= h($q['status']) ?>"><?= ucfirst(h($q['status'])) ?></span></td>
                 <td><?= date('M j, Y', strtotime($q['created_at'])) ?></td>
                 <td><a href="/inventory/pages/quote-edit.php?id=<?= (int)$q['id'] ?>" class="btn btn-sm btn-outline-secondary">View</a></td>
