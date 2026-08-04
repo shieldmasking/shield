@@ -23,6 +23,7 @@ CREATE TABLE users (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     name            VARCHAR(100) NOT NULL,
     email           VARCHAR(150) NOT NULL UNIQUE,
+    phone           VARCHAR(30) NULL,
     password_hash   VARCHAR(255) NOT NULL,
     failed_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
     locked_until    DATETIME NULL,
@@ -267,6 +268,9 @@ CREATE TABLE settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO settings (`key`, value) VALUES
-    ('company_name', 'Shield Masking Solutions'),
+    ('company_name',    'Shield Masking Solutions'),
+    ('company_address', ''),
+    ('company_phone',   ''),
+    ('company_email',   ''),
     ('low_stock_email', 'admin@shieldmasking.com'),
     ('qb_sync_enabled', '0');

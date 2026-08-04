@@ -10,7 +10,7 @@ $db  = db();
 $msg = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    foreach (['company_name', 'low_stock_email'] as $key) {
+    foreach (['company_name', 'company_address', 'company_phone', 'company_email', 'low_stock_email'] as $key) {
         $val = trim($_POST[$key] ?? '');
         $db->prepare('INSERT INTO settings (`key`, value) VALUES (?,?) ON DUPLICATE KEY UPDATE value=?')
            ->execute([$key, $val, $val]);
@@ -41,6 +41,21 @@ render_header('Admin — Settings', 'admin');
     <div class="mb-3">
         <label class="form-label fw-semibold">Company Name</label>
         <input type="text" name="company_name" class="form-control" value="<?= h($settings['company_name'] ?? '') ?>">
+    </div>
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Company Address</label>
+        <textarea name="company_address" class="form-control" rows="3" placeholder="Street, City, State ZIP"><?= h($settings['company_address'] ?? '') ?></textarea>
+        <div class="form-text">Appears on quote PDFs.</div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Company Phone</label>
+            <input type="text" name="company_phone" class="form-control" value="<?= h($settings['company_phone'] ?? '') ?>">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Company Email</label>
+            <input type="email" name="company_email" class="form-control" value="<?= h($settings['company_email'] ?? '') ?>">
+        </div>
     </div>
     <div class="mb-3">
         <label class="form-label fw-semibold">Low-Stock Alert Email</label>

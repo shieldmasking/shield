@@ -11,7 +11,7 @@ $quote_id = (int)($_GET['id'] ?? 0);
 
 $stmt = $db->prepare('
     SELECT q.*, c.name AS customer_name, c.company, c.email, c.phone, c.billing_address,
-           u.name AS created_by_name
+           u.name AS created_by_name, u.email AS created_by_email, u.phone AS created_by_phone
     FROM quotes q
     JOIN customers c ON c.id = q.customer_id
     JOIN users u ON u.id = q.created_by
@@ -38,7 +38,10 @@ $settings = [];
 foreach ($db->query('SELECT `key`, value FROM settings') as $row) {
     $settings[$row['key']] = $row['value'];
 }
-$company_name = $settings['company_name'] ?? 'Shield Masking Solutions';
+$company_name    = $settings['company_name']    ?? 'Shield Masking Solutions';
+$company_address = $settings['company_address'] ?? '';
+$company_phone   = $settings['company_phone']   ?? '';
+$company_email   = $settings['company_email']   ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -111,6 +114,9 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
         <div>
             <div class="company-name"><?= h($company_name) ?></div>
             <div class="company-sub">Thermal Spray Masking Products</div>
+            <?php if ($company_address): ?><div class="company-sub" style="margin-top:4px"><?= nl2br(h($company_address)) ?></div><?php endif; ?>
+            <?php if ($company_phone): ?><div class="company-sub"><?= h($company_phone) ?></div><?php endif; ?>
+            <?php if ($company_email): ?><div class="company-sub"><?= h($company_email) ?></div><?php endif; ?>
         </div>
         <div class="quote-meta">
             <div class="quote-number">QUOTE #<?= (int)$quote['quote_number'] ?></div>
@@ -130,8 +136,10 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
         </div>
         <div class="address-block">
             <div class="address-label">Prepared By</div>
-            <div class="name"><?= h($company_name) ?></div>
-            <div><?= h($quote['created_by_name']) ?></div>
+            <div class="name"><?= h($quote['created_by_name']) ?></div>
+            <?php if ($quote['created_by_email']): ?><div><?= h($quote['created_by_email']) ?></div><?php endif; ?>
+            <?php if ($quote['created_by_phone']): ?><div><?= h($quote['created_by_phone']) ?></div><?php endif; ?>
+            <div style="margin-top:4px"><?= h($company_name) ?></div>
         </div>
     </div>
 
