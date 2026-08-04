@@ -155,7 +155,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
         </thead>
         <tbody>
         <?php foreach ($line_items as $li):
-            $desc = width_label($li) . ' x ' . (int)$li['roll_length_yards'] . 'yds'
+            $desc = format_width((float)$li['width_inches']) . ' x ' . (int)$li['roll_length_yards'] . 'yds'
                   . ($li['description'] ? ' ' . $li['description'] : '');
         ?>
         <tr>
