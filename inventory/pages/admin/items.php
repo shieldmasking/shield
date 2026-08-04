@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['save_base'])) {
         $base_sku  = strtoupper(trim($_POST['base_sku']));
         $name      = trim($_POST['name']);
+        $sku       = trim($_POST['sku'] ?? '');
         $desc      = trim($_POST['description']);
         $land_cost = (float)$_POST['land_cost_base'];
         $markup    = (float)$_POST['markup_multiplier'];
@@ -36,11 +37,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($datasheet_path !== null) {
-            $db->prepare('UPDATE products SET name=?, description=?, land_cost_base=?, markup_multiplier=?, datasheet_path=? WHERE base_sku=?')
-               ->execute([$name, $desc ?: null, $land_cost, $markup, $datasheet_path, $base_sku]);
+            $db->prepare('UPDATE products SET name=?, sku=?, description=?, land_cost_base=?, markup_multiplier=?, datasheet_path=? WHERE base_sku=?')
+               ->execute([$name, $sku ?: null, $desc ?: null, $land_cost, $markup, $datasheet_path, $base_sku]);
         } else {
-            $db->prepare('UPDATE products SET name=?, description=?, land_cost_base=?, markup_multiplier=? WHERE base_sku=?')
-               ->execute([$name, $desc ?: null, $land_cost, $markup, $base_sku]);
+            $db->prepare('UPDATE products SET name=?, sku=?, description=?, land_cost_base=?, markup_multiplier=? WHERE base_sku=?')
+               ->execute([$name, $sku ?: null, $desc ?: null, $land_cost, $markup, $base_sku]);
         }
         $msg = "Pricing updated for {$base_sku}.";
 
@@ -56,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['add_base'])) {
         $base_sku   = strtoupper(trim($_POST['base_sku']));
         $name       = trim($_POST['name']);
+        $sku        = trim($_POST['sku'] ?? '');
         $desc       = trim($_POST['description']);
         $cat_id     = (int)$_POST['category_id'];
         $coo        = strtoupper(trim($_POST['coo']));
@@ -69,10 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $sku        = make_item_sku($base_sku, $fixed_w, false);
 
         $db->prepare('INSERT INTO products
-            (base_sku, name, description, category_id, coo, factory_product_num, thickness_mm,
+            (base_sku, name, sku, description, category_id, coo, factory_product_num, thickness_mm,
              roll_length_yards, is_log, is_fixed_width, land_cost_base, markup_multiplier)
-            VALUES (?,?,?,?,?,?,?,?,0,?,?,?)')
-           ->execute([$base_sku, $name, $desc ?: null, $cat_id, $coo, $factory, $thick,
+            VALUES (?,?,?,?,?,?,?,?,?,0,?,?,?)')
+           ->execute([$base_sku, $name, $sku ?: null, $desc ?: null, $cat_id, $coo, $factory, $thick,
                       $roll_len, $is_fixed, $land_cost, $markup]);
 
         $db->prepare('INSERT INTO items (base_sku, sku, width_inches, is_active) VALUES (?,?,?,1)')
@@ -117,8 +119,8 @@ render_header('Admin — Products', 'admin');
 <div class="card mb-3">
 <div class="card-header d-flex justify-content-between align-items-center">
     <div>
-        <strong><?= h($prod['base_sku']) ?></strong>
-        <span class="text-muted ms-2"><?= h($prod['name']) ?></span>
+        <strong><?= h($prod['name']) ?></strong>
+        <?php if ($prod['sku']): ?><span class="text-muted ms-2"><?= h($prod['sku']) ?></span><?php endif; ?>
         <span class="badge bg-secondary ms-2"><?= h($prod['cat_name']) ?></span>
         <?php if ($prod['datasheet_path']): ?>
         <a href="/inventory/<?= h($prod['datasheet_path']) ?>" target="_blank" class="ms-2 small">Datasheet</a>
@@ -130,6 +132,7 @@ render_header('Admin — Products', 'admin');
             onclick="openBaseEdit(<?= htmlspecialchars(json_encode([
                 'base_sku'          => $prod['base_sku'],
                 'name'              => $prod['name'],
+                'sku'               => $prod['sku'] ?? '',
                 'description'       => $prod['description'] ?? '',
                 'land_cost_base'    => $prod['land_cost_base'],
                 'markup_multiplier' => $prod['markup_multiplier'],
@@ -194,9 +197,13 @@ render_header('Admin — Products', 'admin');
 <div class="modal-body">
     <div class="alert alert-info py-2">Changes to land cost and markup apply to <strong>all widths</strong> of this SKU.</div>
     <div class="row g-3">
-        <div class="col-12">
-            <label class="form-label">Product Name</label>
+        <div class="col-md-8">
+            <label class="form-label">Name</label>
             <input type="text" name="name" id="editBaseName" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Internal SKU</label>
+            <input type="text" name="sku" id="editBaseSku2" class="form-control" placeholder="e.g. 14-101730S-1">
         </div>
         <div class="col-12">
             <label class="form-label">Description</label>
@@ -264,8 +271,10 @@ render_header('Admin — Products', 'admin');
     <div class="row g-3">
         <div class="col-md-2"><label class="form-label">Base SKU</label>
             <input type="text" name="base_sku" class="form-control" placeholder="730D" required></div>
-        <div class="col-md-5"><label class="form-label">Name</label>
+        <div class="col-md-4"><label class="form-label">Name</label>
             <input type="text" name="name" class="form-control" required></div>
+        <div class="col-md-3"><label class="form-label">Internal SKU</label>
+            <input type="text" name="sku" class="form-control" placeholder="e.g. 14-101730S-1"></div>
         <div class="col-md-5"><label class="form-label">Category</label>
             <select name="category_id" class="form-select" required>
                 <?php foreach ($categories as $cat): ?>
@@ -309,8 +318,9 @@ render_header('Admin — Products', 'admin');
 <script>
 function openBaseEdit(data) {
     document.getElementById('editBaseSku').value            = data.base_sku;
-    document.getElementById('editBaseSkuLabel').textContent = data.base_sku;
+    document.getElementById('editBaseSkuLabel').textContent = data.name;
     document.getElementById('editBaseName').value           = data.name;
+    document.getElementById('editBaseSku2').value           = data.sku || '';
     document.getElementById('editBaseDescription').value    = data.description || '';
     document.getElementById('editBaseLandCost').value       = data.land_cost_base;
     document.getElementById('editBaseMarkup').value         = data.markup_multiplier;

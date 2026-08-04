@@ -54,6 +54,7 @@ INSERT INTO categories (name) VALUES
 CREATE TABLE products (
     base_sku            VARCHAR(20)   NOT NULL,
     name                VARCHAR(150)  NOT NULL,
+    sku                 VARCHAR(50)   NULL,
     description         TEXT          NULL,
     datasheet_path      VARCHAR(255)  NULL,
     category_id         INT           NOT NULL,
