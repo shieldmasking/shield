@@ -1,9 +1,3 @@
-# Force HTTPS (skip if already HTTPS or behind proxy)
-RewriteEngine On
-RewriteCond %{HTTPS} off
-RewriteCond %{HTTP:X-Forwarded-Proto} !https
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
 # Custom 404
 ErrorDocument 404 /inventory/404.php
 
