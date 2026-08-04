@@ -74,12 +74,10 @@ function standard_widths(): array {
  * Examples: 730D + 1.0 → 730D-1, 730D + 0.125 → 730D-0125, 730D + 22.83 (log) → 730D-L22.8
  */
 function make_item_sku(string $base_sku, float $width_inches, bool $is_log): string {
+    $code = rtrim(rtrim(number_format($width_inches, 3, '.', ''), '0'), '.');
     if ($is_log) {
-        $code = rtrim(rtrim(number_format($width_inches, 1, '.', ''), '0'), '.');
         return $base_sku . '-L' . $code;
     }
-    // Remove decimal point, then strip trailing zeros
-    $code = rtrim(str_replace('.', '', number_format($width_inches, 3, '.', '')), '0');
     return $base_sku . '-' . $code;
 }
 

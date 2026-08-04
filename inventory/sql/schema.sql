@@ -81,14 +81,14 @@ CREATE TABLE items (
 -- Seed: 730D — Glass Cloth Tape 2-Layer w/Liner (Heavy) | TW | 18 yds | $19.42 base | ×2.20
 -- Widths from inventory PDF; only rows with NEW OH > 0 get stocked, rest pre-defined
 INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('730D','730D-0125','Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.125,0,19.42,2.2000,34),
-('730D','730D-025', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.250,0,19.42,2.2000,30),
-('730D','730D-0375','Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.375,0,19.42,2.2000,0),
-('730D','730D-05',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.500,0,19.42,2.2000,7),
-('730D','730D-075', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.750,0,19.42,2.2000,59),
+('730D','730D-0.125','Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.125,0,19.42,2.2000,34),
+('730D','730D-0.25', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.250,0,19.42,2.2000,30),
+('730D','730D-0.375','Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.375,0,19.42,2.2000,0),
+('730D','730D-0.5',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.500,0,19.42,2.2000,7),
+('730D','730D-0.75', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.750,0,19.42,2.2000,59),
 ('730D','730D-1',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.000,0,19.42,2.2000,139),
-('730D','730D-125', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.250,0,19.42,2.2000,0),
-('730D','730D-15',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.500,0,19.42,2.2000,0),
+('730D','730D-1.25', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.250,0,19.42,2.2000,0),
+('730D','730D-1.5',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.500,0,19.42,2.2000,0),
 ('730D','730D-2',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,2.000,0,19.42,2.2000,125),
 ('730D','730D-3',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,3.000,0,19.42,2.2000,0),
 ('730D','730D-4',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,4.000,0,19.42,2.2000,0),
@@ -107,14 +107,14 @@ INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, t
 
 -- Seed: 730S — Glass Cloth Tape w/Liner (Heavy) | TW | 36 yds | $15.89 base | ×2.19
 INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('730S','730S-0125','Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.125,0,15.89,2.1900,160),
-('730S','730S-025', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.250,0,15.89,2.1900,92),
-('730S','730S-0375','Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.375,0,15.89,2.1900,0),
-('730S','730S-05',  'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.500,0,15.89,2.1900,6),
-('730S','730S-075', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.750,0,15.89,2.1900,0),
+('730S','730S-0.125','Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.125,0,15.89,2.1900,160),
+('730S','730S-0.25', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.250,0,15.89,2.1900,92),
+('730S','730S-0.375','Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.375,0,15.89,2.1900,0),
+('730S','730S-0.5',  'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.500,0,15.89,2.1900,6),
+('730S','730S-0.75', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.750,0,15.89,2.1900,0),
 ('730S','730S-1',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.000,0,15.89,2.1900,75),
-('730S','730S-125', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.250,0,15.89,2.1900,18),
-('730S','730S-15',  'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.500,0,15.89,2.1900,28),
+('730S','730S-1.25', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.250,0,15.89,2.1900,18),
+('730S','730S-1.5',  'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.500,0,15.89,2.1900,28),
 ('730S','730S-2',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,2.000,0,15.89,2.1900,66),
 ('730S','730S-3',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,3.000,0,15.89,2.1900,12),
 ('730S','730S-4',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,4.000,0,15.89,2.1900,28),
@@ -124,7 +124,7 @@ INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, t
 -- Seed: 730SL — Glass Cloth Tape 2-Layer w/Liner | TW | 18 yds | $17.33 base | ×2.22
 INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
 ('730SL','730SL-1',   'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,1.000,0,17.33,2.2200,128),
-('730SL','730SL-15',  'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,1.500,0,17.33,2.2200,56),
+('730SL','730SL-1.5',  'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,1.500,0,17.33,2.2200,56),
 ('730SL','730SL-2',   'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,2.000,0,17.33,2.2200,80),
 ('730SL','730SL-5',   'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,5.000,0,17.33,2.2200,100),
 ('730SL','730SL-L42', 'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,42.000,1,17.33,2.2200,0);
