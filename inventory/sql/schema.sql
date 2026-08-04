@@ -197,6 +197,7 @@ CREATE TABLE customers (
     email           VARCHAR(150) NULL,
     phone           VARCHAR(30) NULL,
     billing_address TEXT NULL,
+    terms           VARCHAR(100) NOT NULL DEFAULT 'Net 30',
     synced_at       DATETIME NULL,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

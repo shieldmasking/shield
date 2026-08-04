@@ -126,8 +126,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare('DELETE FROM quote_items WHERE quote_id=?')->execute([$quote_id]);
             } else {
                 $qnum = next_quote_number($db);
+                $cterms = $db->prepare('SELECT terms FROM customers WHERE id=?');
+                $cterms->execute([$customer_id]);
+                $cterms = ($cterms->fetchColumn() ?: 'Net 30');
                 $db->prepare('INSERT INTO quotes (quote_number, customer_id, notes, created_by) VALUES (?,?,?,?)')
-                   ->execute([$qnum, $customer_id, $notes ?: 'Net 30', current_user_id()]);
+                   ->execute([$qnum, $customer_id, $notes ?: $cterms, current_user_id()]);
                 $quote_id = (int)$db->lastInsertId();
             }
 

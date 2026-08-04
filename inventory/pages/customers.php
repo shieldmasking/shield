@@ -19,10 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_customer'])) {
     $email   = trim($_POST['email'] ?? '');
     $phone   = trim($_POST['phone'] ?? '');
     $addr    = trim($_POST['billing_address'] ?? '');
+    $terms   = trim($_POST['terms'] ?? '') ?: 'Net 30';
 
     if ($name && $id) {
-        $db->prepare('UPDATE customers SET name=?, company=?, email=?, phone=?, billing_address=? WHERE id=?')
-           ->execute([$name, $company ?: null, $email ?: null, $phone ?: null, $addr ?: null, $id]);
+        $db->prepare('UPDATE customers SET name=?, company=?, email=?, phone=?, billing_address=?, terms=? WHERE id=?')
+           ->execute([$name, $company ?: null, $email ?: null, $phone ?: null, $addr ?: null, $terms, $id]);
         $msg = 'Customer updated.';
     }
 }
@@ -34,10 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_customer'])) {
     $email   = trim($_POST['email'] ?? '');
     $phone   = trim($_POST['phone'] ?? '');
     $addr    = trim($_POST['billing_address'] ?? '');
+    $terms   = trim($_POST['terms'] ?? '') ?: 'Net 30';
 
     if ($name) {
-        $db->prepare('INSERT INTO customers (name, company, email, phone, billing_address) VALUES (?,?,?,?,?)')
-           ->execute([$name, $company ?: null, $email ?: null, $phone ?: null, $addr ?: null]);
+        $db->prepare('INSERT INTO customers (name, company, email, phone, billing_address, terms) VALUES (?,?,?,?,?,?)')
+           ->execute([$name, $company ?: null, $email ?: null, $phone ?: null, $addr ?: null, $terms]);
         $msg = 'Customer added.';
     }
 }
@@ -87,7 +89,7 @@ render_header('Customers', 'customers');
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
             <thead><tr>
-                <th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>QB Sync</th><th></th>
+                <th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Terms</th><th>QB Sync</th><th></th>
             </tr></thead>
             <tbody>
             <?php foreach ($customers as $c): ?>
@@ -96,6 +98,7 @@ render_header('Customers', 'customers');
                 <td><?= h($c['company'] ?? '—') ?></td>
                 <td><?= h($c['email'] ?? '—') ?></td>
                 <td><?= h($c['phone'] ?? '—') ?></td>
+                <td><?= h($c['terms'] ?? 'Net 30') ?></td>
                 <td><?= $c['synced_at'] ? date('M j, Y', strtotime($c['synced_at'])) : '<span class="text-muted">Manual</span>' ?></td>
                 <td class="text-end"><button class="btn btn-sm btn-outline-primary"
                     onclick="openEdit(<?= htmlspecialchars(json_encode($c), ENT_QUOTES) ?>)"
@@ -131,6 +134,8 @@ render_header('Customers', 'customers');
                         <input type="text" name="phone" id="editPhone" class="form-control"></div>
                     <div class="mb-2"><label class="form-label">Billing Address</label>
                         <textarea name="billing_address" id="editAddr" class="form-control" rows="2"></textarea></div>
+                    <div class="mb-2"><label class="form-label">Terms</label>
+                        <input type="text" name="terms" id="editTerms" class="form-control" value="Net 30"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -161,6 +166,8 @@ render_header('Customers', 'customers');
                         <input type="text" name="phone" class="form-control"></div>
                     <div class="mb-2"><label class="form-label">Billing Address</label>
                         <textarea name="billing_address" class="form-control" rows="2"></textarea></div>
+                    <div class="mb-2"><label class="form-label">Terms</label>
+                        <input type="text" name="terms" class="form-control" value="Net 30"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -179,6 +186,7 @@ function openEdit(c) {
     document.getElementById('editEmail').value   = c.email || '';
     document.getElementById('editPhone').value   = c.phone || '';
     document.getElementById('editAddr').value    = c.billing_address || '';
+    document.getElementById('editTerms').value   = c.terms || 'Net 30';
 }
 </script>
 
