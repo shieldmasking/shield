@@ -1,6 +1,7 @@
-# Force HTTPS
+# Force HTTPS (skip if already HTTPS or behind proxy)
 RewriteEngine On
 RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Custom 404
@@ -23,8 +24,3 @@ Header always set X-XSS-Protection "1; mode=block"
     RewriteRule ^sql/ - [F,L]
     RewriteRule ^uploads/.*\.php$ - [F,L]
 </IfModule>
-
-# PHP settings
-php_flag display_errors Off
-php_value upload_max_filesize 10M
-php_value post_max_size 10M
