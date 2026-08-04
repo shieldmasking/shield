@@ -139,7 +139,6 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
             <div class="name"><?= h($quote['created_by_name']) ?></div>
             <?php if ($quote['created_by_email']): ?><div><?= h($quote['created_by_email']) ?></div><?php endif; ?>
             <?php if ($quote['created_by_phone']): ?><div><?= h($quote['created_by_phone']) ?></div><?php endif; ?>
-            <div style="margin-top:4px"><?= h($company_name) ?></div>
         </div>
     </div>
 
