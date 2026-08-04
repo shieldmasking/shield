@@ -35,6 +35,7 @@ function attempt_login(PDO $db, string $email, string $password): string {
 
     session_regenerate_id(true);
     $_SESSION['user_id'] = $user['id'];
+    session_write_close();
     return '';
 }
 
