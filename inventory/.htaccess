@@ -1,6 +1,3 @@
-# Enable output buffering so header() redirects always work
-php_value output_buffering 4096
-
 # Custom 404
 ErrorDocument 404 /inventory/404.php
 
