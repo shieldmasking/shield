@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/functions.php';
+
 function render_header(string $title, string $active = ''): void {
     $nav = [
         'dashboard'  => ['Dashboard',  '/inventory/pages/dashboard.php'],
