@@ -25,7 +25,8 @@ $order = $stmt->fetch();
 if (!$order) { header('Location: /inventory/pages/orders.php'); exit; }
 
 $items_stmt = $db->prepare('
-    SELECT oi.*, i.sku, i.name AS item_name, i.roll_length_yards, i.is_fixed_width
+    SELECT oi.*, i.sku, i.name AS item_name, i.roll_length_yards,
+           i.width_inches, i.is_log, i.is_fixed_width
     FROM order_items oi
     JOIN items i ON i.id = oi.item_id
     WHERE oi.order_id = ?
@@ -93,7 +94,7 @@ render_header("Order #{$order_id}", 'orders');
             <tr>
                 <td class="fw-semibold"><?= h($li['sku']) ?></td>
                 <td><?= h($li['item_name']) ?></td>
-                <td><?= $li['is_fixed_width'] ? '2"' : format_width((float)$li['width_inches']) ?></td>
+                <td><?= width_label($li) ?></td>
                 <td><?= (int)$li['roll_length_yards'] ?>yds</td>
                 <td><?= (int)$li['quantity'] ?></td>
                 <td><?= currency((float)$li['unit_price']) ?></td>

@@ -23,7 +23,14 @@ if ($quote_id) {
     $quote = $stmt->fetch();
     if (!$quote) { header('Location: /inventory/pages/quotes.php'); exit; }
 
-    $stmt = $db->prepare('SELECT qi.*, i.sku, i.name AS item_name, i.is_fixed_width, i.fixed_width_inches, i.roll_length_yards FROM quote_items qi JOIN items i ON i.id=qi.item_id WHERE qi.quote_id=? ORDER BY qi.id');
+    $stmt = $db->prepare('
+        SELECT qi.*, i.base_sku, i.sku, i.name AS item_name, i.width_inches,
+               i.is_log, i.is_fixed_width, i.roll_length_yards
+        FROM quote_items qi
+        JOIN items i ON i.id = qi.item_id
+        WHERE qi.quote_id = ?
+        ORDER BY qi.id
+    ');
     $stmt->execute([$quote_id]);
     $quote_items = $stmt->fetchAll();
 }
@@ -36,7 +43,7 @@ $is_readonly   = $quote && !$is_editable;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Change status only (Mark Sent / Reject / Expire)
+    // Change status only
     if ($action === 'status') {
         $new = $_POST['new_status'] ?? '';
         if ($quote_id && in_array($new, ['sent','expired','rejected'])) {
@@ -48,7 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Approve quote → create order
     if ($action === 'approve' && $is_approvable) {
-        // Upload PO PDF
         $po_path = null;
         if (!empty($_FILES['po_pdf']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['po_pdf']['name'], PATHINFO_EXTENSION));
@@ -67,7 +73,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Update line items with approval quantities
         if (empty($errors)) {
             $approval_items = $_POST['approval_items'] ?? [];
             foreach ($approval_items as $qi_id => $row) {
@@ -82,24 +87,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Update quote status + PO path
             $db->prepare('UPDATE quotes SET status=\'approved\', po_pdf_path=? WHERE id=?')
                ->execute([$po_path, $quote_id]);
 
-            // Create order + deduct inventory
             try {
                 $order_id = create_order_from_quote($db, $quote_id, current_user_id());
                 header("Location: /inventory/pages/order-view.php?id={$order_id}&msg=Order+created");
                 exit;
             } catch (Throwable $e) {
                 $errors[] = 'Order creation failed. Please try again.';
-                // Rollback quote status
                 $db->prepare('UPDATE quotes SET status=\'sent\', po_pdf_path=NULL WHERE id=?')->execute([$quote_id]);
             }
         }
 
-        // Re-load quote items after potential changes
-        $stmt = $db->prepare('SELECT qi.*, i.sku, i.name AS item_name, i.is_fixed_width, i.fixed_width_inches, i.roll_length_yards FROM quote_items qi JOIN items i ON i.id=qi.item_id WHERE qi.quote_id=? ORDER BY qi.id');
+        $stmt = $db->prepare('
+            SELECT qi.*, i.base_sku, i.sku, i.name AS item_name, i.width_inches,
+                   i.is_log, i.is_fixed_width, i.roll_length_yards
+            FROM quote_items qi JOIN items i ON i.id = qi.item_id
+            WHERE qi.quote_id = ? ORDER BY qi.id
+        ');
         $stmt->execute([$quote_id]);
         $quote_items = $stmt->fetchAll();
     }
@@ -115,27 +121,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             if ($quote_id) {
-                // Update existing
                 $db->prepare('UPDATE quotes SET customer_id=?, notes=?, updated_at=NOW() WHERE id=?')
                    ->execute([$customer_id, $notes ?: null, $quote_id]);
                 $db->prepare('DELETE FROM quote_items WHERE quote_id=?')->execute([$quote_id]);
             } else {
-                // Create new
                 $qnum = next_quote_number($db);
                 $db->prepare('INSERT INTO quotes (quote_number, customer_id, notes, created_by) VALUES (?,?,?,?)')
                    ->execute([$qnum, $customer_id, $notes ?: null, current_user_id()]);
                 $quote_id = (int)$db->lastInsertId();
             }
 
-            // Insert line items
-            $stmt = $db->prepare('INSERT INTO quote_items (quote_id, item_id, width_inches, quantity, unit_price) VALUES (?,?,?,?,?)');
+            $stmt = $db->prepare('INSERT INTO quote_items (quote_id, item_id, quantity, unit_price) VALUES (?,?,?,?)');
             foreach ($line_items as $li) {
-                $item_id = (int)($li['item_id'] ?? 0);
-                $width   = (float)($li['width_inches'] ?? 1);
-                $qty     = max(1, (int)($li['quantity'] ?? 1));
-                $price   = (float)($li['unit_price'] ?? 0);
-                if ($item_id && $qty > 0 && $price >= 0) {
-                    $stmt->execute([$quote_id, $item_id, $width, $qty, $price]);
+                $base_sku = strtoupper(trim($li['base_sku'] ?? ''));
+                $width    = (float)($li['width_inches'] ?? 0);
+                $qty      = max(1, (int)($li['quantity'] ?? 1));
+                $price    = (float)($li['unit_price'] ?? 0);
+
+                if (!$base_sku || $width <= 0 || $qty <= 0 || $price < 0) continue;
+
+                $is_log  = !empty($li['is_log']);
+                $item_id = find_or_create_item($db, $base_sku, $width, $is_log);
+                if ($item_id) {
+                    $stmt->execute([$quote_id, $item_id, $qty, $price]);
                 }
             }
 
@@ -147,19 +155,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (isset($_GET['msg'])) $msg = $_GET['msg'];
 
-// ── Load form data ─────────────────────────────────────────────────────────
+// ── Load form data ────────────────────────────────────────────────────────────
 
 $customers = $db->query('SELECT id, name, company FROM customers ORDER BY name')->fetchAll();
-$items_all = $db->query('SELECT * FROM items WHERE is_active=1 ORDER BY sku')->fetchAll();
-$wm        = get_width_multipliers($db);
 
-// Items keyed by id for JS
-$items_by_id = [];
-foreach ($items_all as $it) { $items_by_id[$it['id']] = $it; }
+// Distinct base SKUs (one row per base_sku for metadata)
+$base_skus_raw = $db->query('
+    SELECT DISTINCT base_sku, name, roll_length_yards, is_fixed_width
+    FROM items WHERE is_active = 1
+    ORDER BY base_sku
+')->fetchAll();
+$base_skus = [];
+foreach ($base_skus_raw as $b) {
+    $base_skus[$b['base_sku']] = $b;
+}
+
+$wm             = get_width_multipliers($db);
+$standard_widths = standard_widths(); // 0.125 to 6.0 in 0.125" steps
 
 $total = array_sum(array_map(fn($r) => $r['quantity'] * $r['unit_price'], $quote_items));
 
-$page_title = $quote_id ? "Quote #" . $quote['quote_number'] : "New Quote";
+$page_title   = $quote_id ? "Quote #" . $quote['quote_number'] : "New Quote";
 $status_badge = ['draft'=>'secondary','sent'=>'primary','approved'=>'success','expired'=>'warning','rejected'=>'danger'];
 
 render_header($page_title, 'quotes');
@@ -191,7 +207,7 @@ render_header($page_title, 'quotes');
 <?php endif; ?>
 
 <?php if ($is_readonly): ?>
-<!-- Read-only view for approved/rejected/expired quotes -->
+<!-- Read-only view -->
 <div class="row g-3 mb-3">
     <div class="col-md-6">
         <div class="card h-100"><div class="card-header fw-semibold">Customer</div>
@@ -219,7 +235,7 @@ render_header($page_title, 'quotes');
 <tr>
     <td><?= h($li['sku']) ?></td>
     <td><?= h($li['item_name']) ?></td>
-    <td><?= $li['is_fixed_width'] ? '2"' : format_width((float)$li['width_inches']) ?></td>
+    <td><?= width_label($li) ?></td>
     <td><?= (int)$li['roll_length_yards'] ?>yds</td>
     <td><?= (int)$li['quantity'] ?></td>
     <td><?= currency((float)$li['unit_price']) ?></td>
@@ -247,7 +263,7 @@ render_header($page_title, 'quotes');
 <div class="row g-3 mb-3">
     <div class="col-md-5">
         <label class="form-label fw-semibold">Customer <span class="text-danger">*</span></label>
-        <select name="customer_id" id="customerSelect" class="form-select" <?= $is_readonly ? 'disabled' : '' ?> required>
+        <select name="customer_id" id="customerSelect" class="form-select" required>
             <option value="">Select customer...</option>
             <?php foreach ($customers as $c): ?>
             <option value="<?= $c['id'] ?>" <?= ($quote['customer_id'] ?? 0) == $c['id'] ? 'selected' : '' ?>>
@@ -275,7 +291,7 @@ render_header($page_title, 'quotes');
 <div class="table-responsive">
 <table class="table mb-0 align-middle" id="lineItemsTable">
 <thead><tr>
-    <th style="min-width:200px">SKU / Item</th>
+    <th style="min-width:140px">Base SKU</th>
     <th style="min-width:140px">Width</th>
     <th style="width:80px">Length</th>
     <th style="width:80px">Qty</th>
@@ -285,36 +301,35 @@ render_header($page_title, 'quotes');
 </tr></thead>
 <tbody id="lineItems">
 <?php foreach ($quote_items as $li): ?>
-<tr data-row="existing">
+<tr data-row="existing-<?= $li['id'] ?>">
     <td>
-        <select name="items[<?= $li['id'] ?>][item_id]" class="form-select form-select-sm item-select" data-fixed="<?= $li['is_fixed_width'] ? '1' : '0' ?>">
-            <?php foreach ($items_all as $it): ?>
-            <option value="<?= $it['id'] ?>" <?= $it['id'] == $li['item_id'] ? 'selected' : '' ?>><?= h($it['sku']) ?> — <?= h($it['name']) ?></option>
+        <select name="items[<?= $li['id'] ?>][base_sku]" class="form-select form-select-sm sku-select" onchange="onSkuChange(this)">
+            <?php foreach ($base_skus as $bsku => $bdata): ?>
+            <option value="<?= h($bsku) ?>"
+                data-fixed="<?= $bdata['is_fixed_width'] ?>"
+                data-len="<?= $bdata['roll_length_yards'] ?>"
+                <?= $bsku === $li['base_sku'] ? 'selected' : '' ?>>
+                <?= h($bsku) ?>
+            </option>
             <?php endforeach; ?>
         </select>
+        <input type="hidden" name="items[<?= $li['id'] ?>][is_log]" value="<?= $li['is_log'] ? '1' : '0' ?>">
     </td>
     <td>
         <?php if ($li['is_fixed_width']): ?>
-        <input type="hidden" name="items[<?= $li['id'] ?>][width_inches]" value="<?= (float)$li['fixed_width_inches'] ?>">
+        <input type="hidden" name="items[<?= $li['id'] ?>][width_inches]" value="2">
         <span class="text-muted">2" (fixed)</span>
         <?php else: ?>
-        <div class="d-flex gap-1">
-        <select class="form-select form-select-sm width-select" name="items[<?= $li['id'] ?>][width_inches]" style="width:90px" onchange="handleWidthChange(this)">
-            <?php foreach (array_keys($wm) as $w):
-                $w = (float)$w; ?>
+        <select name="items[<?= $li['id'] ?>][width_inches]" class="form-select form-select-sm width-select" onchange="fetchPrice(this.closest('tr'))">
+            <?php foreach ($standard_widths as $w): ?>
             <option value="<?= $w ?>" <?= abs($w - (float)$li['width_inches']) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
             <?php endforeach; ?>
-            <option value="custom" <?= !array_key_exists(number_format((float)$li['width_inches'],3), $wm) ? 'selected' : '' ?>>Custom</option>
         </select>
-        <input type="number" class="form-control form-control-sm width-custom" step="0.001" min="0.01" max="12"
-               style="width:70px;display:<?= !array_key_exists(number_format((float)$li['width_inches'],3), $wm) ? 'block' : 'none' ?>"
-               placeholder="in" value="<?= (float)$li['width_inches'] ?>">
-        </div>
         <?php endif; ?>
     </td>
     <td class="text-muted roll-length"><?= (int)$li['roll_length_yards'] ?>yds</td>
-    <td><input type="number" name="items[<?= $li['id'] ?>][quantity]" class="form-control form-control-sm qty-input" min="1" value="<?= (int)$li['quantity'] ?>" required></td>
-    <td><input type="number" name="items[<?= $li['id'] ?>][unit_price]" class="form-control form-control-sm price-input" step="0.01" min="0" value="<?= number_format((float)$li['unit_price'], 2) ?>" required></td>
+    <td><input type="number" name="items[<?= $li['id'] ?>][quantity]" class="form-control form-control-sm qty-input" min="1" value="<?= (int)$li['quantity'] ?>" required oninput="updateTotals()"></td>
+    <td><input type="number" name="items[<?= $li['id'] ?>][unit_price]" class="form-control form-control-sm price-input" step="0.01" min="0" value="<?= number_format((float)$li['unit_price'], 2) ?>" required oninput="updateTotals()"></td>
     <td class="text-end line-total fw-semibold"><?= currency($li['quantity'] * $li['unit_price']) ?></td>
     <td><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeRow(this)">×</button></td>
 </tr>
@@ -332,7 +347,6 @@ render_header($page_title, 'quotes');
 </div>
 </div>
 
-<!-- Save / Status Actions -->
 <div class="d-flex gap-2 flex-wrap">
     <button type="submit" class="btn btn-primary">Save Quote</button>
 
@@ -350,7 +364,6 @@ render_header($page_title, 'quotes');
 </div>
 </form>
 
-<!-- Hidden status-change form -->
 <form method="post" id="statusForm">
     <input type="hidden" name="action" value="status">
     <input type="hidden" name="new_status" value="">
@@ -359,7 +372,6 @@ render_header($page_title, 'quotes');
 <?php endif; // end editable ?>
 
 <?php if ($is_approvable): ?>
-<!-- Approval Modal -->
 <div class="modal fade" id="approveModal" tabindex="-1">
 <div class="modal-dialog modal-lg">
 <div class="modal-content">
@@ -370,16 +382,12 @@ render_header($page_title, 'quotes');
     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
 <div class="modal-body">
-    <div class="alert alert-info py-2">
-        Review and adjust quantities to match the customer's actual PO. Upload the customer's PO PDF as a reference.
-    </div>
-
+    <div class="alert alert-info py-2">Review quantities to match customer's PO. Upload PO PDF as reference.</div>
     <div class="mb-3">
         <label class="form-label fw-semibold">Customer PO PDF</label>
         <input type="file" name="po_pdf" class="form-control" accept=".pdf">
         <div class="form-text">Optional but recommended. Max 10MB.</div>
     </div>
-
     <table class="table table-sm">
     <thead><tr><th>SKU</th><th>Item</th><th>Width</th><th>Quoted Qty</th><th>Approved Qty</th><th>Unit Price</th></tr></thead>
     <tbody>
@@ -387,7 +395,7 @@ render_header($page_title, 'quotes');
     <tr>
         <td><?= h($li['sku']) ?></td>
         <td><?= h($li['item_name']) ?></td>
-        <td><?= $li['is_fixed_width'] ? '2"' : format_width((float)$li['width_inches']) ?></td>
+        <td><?= width_label($li) ?></td>
         <td class="text-muted"><?= (int)$li['quantity'] ?></td>
         <td style="width:100px">
             <input type="number" name="approval_items[<?= $li['id'] ?>][quantity]"
@@ -412,49 +420,50 @@ render_header($page_title, 'quotes');
 <?php endif; ?>
 
 <script>
-const ITEMS   = <?= json_encode(array_values($items_all)) ?>;
-const WIDTHS  = <?= json_encode(array_map('floatval', array_keys($wm))) ?>;
-const IS_NEW  = <?= $quote_id ? 'false' : 'true' ?>;
-let rowCounter = 1000;
+const BASE_SKUS = <?= json_encode(array_values($base_skus)) ?>;
+const WIDTHS    = <?= json_encode($standard_widths) ?>;
+const IS_NEW    = <?= $quote_id ? 'false' : 'true' ?>;
+let rowCounter  = 1000;
+
+function skuOpts(selectedSku) {
+    return BASE_SKUS.map(b =>
+        `<option value="${b.base_sku}" data-fixed="${b.is_fixed_width}" data-len="${b.roll_length_yards}"${b.base_sku === selectedSku ? ' selected' : ''}>${b.base_sku}</option>`
+    ).join('');
+}
+
+function widthOpts(selectedWidth) {
+    return WIDTHS.map(w => {
+        const label = parseFloat(w).toString().replace(/\.?0+$/, '') + '"';
+        const sel   = Math.abs(w - selectedWidth) < 0.001 ? ' selected' : '';
+        return `<option value="${w}"${sel}>${label}</option>`;
+    }).join('');
+}
 
 function addRow(data = {}) {
     rowCounter++;
-    const n = rowCounter;
+    const n        = rowCounter;
+    const baseSku  = data.base_sku  || BASE_SKUS[0]?.base_sku || '';
+    const width    = data.width     || 1;
+    const qty      = data.qty       || 1;
+    const price    = data.price     || 0;
+    const isLog    = data.is_log    || 0;
+    const base     = BASE_SKUS.find(b => b.base_sku === baseSku) || BASE_SKUS[0];
+    const isFixed  = base?.is_fixed_width == 1;
+    const len      = base?.roll_length_yards || '';
 
-    const item  = data.item  || ITEMS[0];
-    const width = data.width || 1;
-    const qty   = data.qty   || 1;
-    const price = data.price || 0;
-
-    const widthOpts = WIDTHS.map(w => {
-        const sel = Math.abs(w - width) < 0.001 ? 'selected' : '';
-        return `<option value="${w}" ${sel}>${formatWidth(w)}</option>`;
-    }).join('');
-
-    const customHidden = WIDTHS.some(w => Math.abs(w - width) < 0.001) ? 'none' : 'block';
-    const customWidth  = WIDTHS.some(w => Math.abs(w - width) < 0.001) ? '' : width;
-
-    const widthCell = item.is_fixed_width
-        ? `<input type="hidden" name="items[${n}][width_inches]" value="${item.fixed_width_inches}"><span class="text-muted">2" (fixed)</span>`
-        : `<div class="d-flex gap-1">
-            <select class="form-select form-select-sm width-select" name="items[${n}][width_inches]" style="width:90px" onchange="handleWidthChange(this)">
-                ${widthOpts}
-                <option value="custom" ${customHidden !== 'none' ? 'selected' : ''}>Custom</option>
-            </select>
-            <input type="number" class="form-control form-control-sm width-custom" step="0.001" min="0.01" max="12"
-                   style="width:70px;display:${customHidden}" placeholder="in" value="${customWidth}">
-           </div>`;
-
-    const itemOpts = ITEMS.map(it =>
-        `<option value="${it.id}" ${it.id == item.id ? 'selected' : ''} data-fixed="${it.is_fixed_width}" data-fixedw="${it.fixed_width_inches || ''}" data-len="${it.roll_length_yards}">${it.sku} — ${it.name}</option>`
-    ).join('');
+    const widthCell = isFixed
+        ? `<input type="hidden" name="items[${n}][width_inches]" value="2"><span class="text-muted">2" (fixed)</span>`
+        : `<select name="items[${n}][width_inches]" class="form-select form-select-sm width-select" onchange="fetchPrice(this.closest('tr'))">${widthOpts(width)}</select>`;
 
     const tr = document.createElement('tr');
     tr.dataset.row = n;
     tr.innerHTML = `
-        <td><select name="items[${n}][item_id]" class="form-select form-select-sm item-select" onchange="onItemChange(this)">${itemOpts}</select></td>
+        <td>
+            <select name="items[${n}][base_sku]" class="form-select form-select-sm sku-select" onchange="onSkuChange(this)">${skuOpts(baseSku)}</select>
+            <input type="hidden" name="items[${n}][is_log]" value="${isLog}">
+        </td>
         <td class="width-cell">${widthCell}</td>
-        <td class="text-muted roll-length">${item.roll_length_yards}yds</td>
+        <td class="text-muted roll-length">${len}yds</td>
         <td><input type="number" name="items[${n}][quantity]" class="form-control form-control-sm qty-input" min="1" value="${qty}" required oninput="updateTotals()"></td>
         <td><input type="number" name="items[${n}][unit_price]" class="form-control form-control-sm price-input" step="0.01" min="0" value="${price > 0 ? price.toFixed(2) : ''}" required oninput="updateTotals()"></td>
         <td class="text-end line-total fw-semibold">${price > 0 ? '$' + (qty * price).toFixed(2) : '—'}</td>
@@ -462,68 +471,26 @@ function addRow(data = {}) {
     `;
     document.getElementById('lineItems').appendChild(tr);
 
-    // Auto-fetch price if item + width are set and no price provided
-    if (!data.price || data.price === 0) {
-        const sel = tr.querySelector('.item-select');
-        fetchPrice(tr);
-    }
-    initWidthEvents(tr);
+    if (!data.price || data.price === 0) fetchPrice(tr);
     updateTotals();
 }
 
-function onItemChange(sel) {
+function onSkuChange(sel) {
     const tr      = sel.closest('tr');
     const opt     = sel.selectedOptions[0];
     const isFixed = opt.dataset.fixed === '1';
-    const fixedW  = opt.dataset.fixedw;
     const len     = opt.dataset.len;
     const n       = tr.dataset.row;
 
-    // Update roll length display
-    const lenCell = tr.querySelector('.roll-length');
-    if (lenCell) lenCell.textContent = len + 'yds';
+    tr.querySelector('.roll-length').textContent = len + 'yds';
 
-    // Update width cell
     const widthCell = tr.querySelector('.width-cell');
     if (isFixed) {
-        widthCell.innerHTML = `<input type="hidden" name="items[${n}][width_inches]" value="${fixedW}"><span class="text-muted">2" (fixed)</span>`;
+        widthCell.innerHTML = `<input type="hidden" name="items[${n}][width_inches]" value="2"><span class="text-muted">2" (fixed)</span>`;
     } else {
-        const widthOpts = WIDTHS.map(w => `<option value="${w}">${formatWidth(w)}</option>`).join('');
-        widthCell.innerHTML = `<div class="d-flex gap-1">
-            <select class="form-select form-select-sm width-select" name="items[${n}][width_inches]" style="width:90px" onchange="handleWidthChange(this)">
-                ${widthOpts}
-                <option value="custom">Custom</option>
-            </select>
-            <input type="number" class="form-control form-control-sm width-custom" step="0.001" min="0.01" max="12"
-                   style="width:70px;display:none" placeholder="in">
-           </div>`;
-        initWidthEvents(tr);
+        widthCell.innerHTML = `<select name="items[${n}][width_inches]" class="form-select form-select-sm width-select" onchange="fetchPrice(this.closest('tr'))">${widthOpts(1)}</select>`;
     }
     fetchPrice(tr);
-}
-
-function handleWidthChange(sel) {
-    const tr = sel.closest('tr');
-    const n  = tr.dataset.row;
-    const customInput = tr.querySelector('.width-custom');
-    if (sel.value === 'custom') {
-        customInput.style.display = 'block';
-        // Rename select so it doesn't submit, use custom input value
-        sel.name = '';
-        customInput.name = `items[${n}][width_inches]`;
-        customInput.addEventListener('change', () => fetchPrice(tr), { once: true });
-    } else {
-        customInput.style.display = 'none';
-        sel.name = `items[${n}][width_inches]`;
-        customInput.name = '';
-        fetchPrice(tr);
-    }
-}
-
-function initWidthEvents(tr) {
-    tr.querySelectorAll('.width-select').forEach(sel => {
-        sel.addEventListener('change', function() { handleWidthChange(this); });
-    });
 }
 
 function removeRow(btn) {
@@ -532,21 +499,17 @@ function removeRow(btn) {
 }
 
 async function fetchPrice(tr) {
-    const itemSel  = tr.querySelector('.item-select');
+    const skuSel  = tr.querySelector('.sku-select');
     const widthSel = tr.querySelector('.width-select');
-    const widthCus = tr.querySelector('.width-custom');
     const priceIn  = tr.querySelector('.price-input');
-    const n        = tr.dataset.row;
 
-    if (!itemSel) return;
-    const itemId = itemSel.value;
-    let width = widthSel ? (widthSel.value === 'custom' ? (widthCus?.value || '') : widthSel.value)
-                         : (tr.querySelector('input[type="hidden"]')?.value || '');
-
-    if (!itemId || !width || parseFloat(width) <= 0) return;
+    if (!skuSel || !widthSel || !priceIn) return;
+    const baseSku = skuSel.value;
+    const width   = widthSel.value;
+    if (!baseSku || !width || parseFloat(width) <= 0) return;
 
     try {
-        const res  = await fetch(`/inventory/api/quote-price.php?item_id=${itemId}&width=${width}`);
+        const res  = await fetch(`/inventory/api/quote-price.php?base_sku=${encodeURIComponent(baseSku)}&width=${width}`);
         const data = await res.json();
         if (data.sell_price !== undefined) {
             priceIn.value = data.sell_price.toFixed(2);
@@ -568,11 +531,7 @@ function updateTotals() {
     document.getElementById('grandTotal').textContent = '$' + total.toFixed(2);
 }
 
-function formatWidth(w) {
-    return parseFloat(w).toString().replace(/\.?0+$/, '') + '"';
-}
-
-// Customer selection → load last quote prices (new quotes only)
+// Customer selection → pre-fill from last quote
 document.getElementById('customerSelect')?.addEventListener('change', async function() {
     if (!IS_NEW) return;
     const cid = this.value;
@@ -583,22 +542,21 @@ document.getElementById('customerSelect')?.addEventListener('change', async func
         const keys = Object.keys(data);
         if (keys.length === 0) return;
 
-        // Clear existing rows and pre-fill from last quote
         document.getElementById('lineItems').innerHTML = '';
-        const itemsById = {};
-        ITEMS.forEach(it => { itemsById[it.id] = it; });
-
-        for (const [itemId, row] of Object.entries(data)) {
-            const item = itemsById[itemId];
-            if (!item) continue;
-            addRow({ item, width: parseFloat(row.width_inches), qty: row.quantity, price: parseFloat(row.unit_price) });
+        for (const [, row] of Object.entries(data)) {
+            addRow({
+                base_sku: row.base_sku,
+                width:    parseFloat(row.width_inches),
+                qty:      row.quantity,
+                price:    parseFloat(row.unit_price),
+                is_log:   row.is_log,
+            });
         }
         document.getElementById('lastQuoteNote').style.display = '';
         updateTotals();
     } catch(e) { /* ignore */ }
 });
 
-// Init totals on load
 updateTotals();
 </script>
 
