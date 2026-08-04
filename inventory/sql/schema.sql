@@ -220,7 +220,7 @@ CREATE TABLE quotes (
     id           INT AUTO_INCREMENT PRIMARY KEY,
     quote_number INT NOT NULL UNIQUE,
     customer_id  INT NOT NULL,
-    status       ENUM('draft','sent','approved','expired','rejected') NOT NULL DEFAULT 'draft',
+    status       ENUM('draft','sent','ordered') NOT NULL DEFAULT 'draft',
     notes        TEXT NULL,
     po_pdf_path  VARCHAR(255) NULL,
     created_by   INT NOT NULL,
