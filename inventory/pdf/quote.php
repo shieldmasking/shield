@@ -176,6 +176,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
                 <td><?= currency($total) ?></td>
             </tr>
         </table>
+        <div style="text-align:right;font-size:8pt;color:#888;margin-top:4px">Plus applicable taxes.</div>
     </div>
 
     <?php if ($quote['notes']): ?>
@@ -184,6 +185,11 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
         <?= nl2br(h($quote['notes'])) ?>
     </div>
     <?php endif; ?>
+
+    <div class="notes-block" style="margin-top:12px">
+        <div class="notes-label">Shipping &amp; Terms</div>
+        FOB Origin. Shipping included on orders over $5,000.
+    </div>
 
     <div class="footer">
         <div><?= h($company_name) ?> &mdash; shieldmasking.com</div>
