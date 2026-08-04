@@ -9,6 +9,16 @@ require_login();
 
 $db = db();
 
+// Status change
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_id'], $_POST['status'])) {
+    $new = $_POST['status'];
+    if (in_array($new, ['draft', 'sent', 'ordered'])) {
+        $db->prepare('UPDATE quotes SET status=? WHERE id=?')->execute([$new, (int)$_POST['quote_id']]);
+    }
+    header('Location: /inventory/pages/dashboard.php');
+    exit;
+}
+
 // Stats
 $total_skus    = $db->query('SELECT COUNT(*) FROM items WHERE is_active = 1')->fetchColumn();
 $low_stock     = $db->query('SELECT COUNT(*) FROM items WHERE is_active = 1 AND reorder_threshold > 0 AND quantity_on_hand <= reorder_threshold')->fetchColumn();
@@ -91,7 +101,16 @@ render_header('Dashboard', 'dashboard');
             <tr>
                 <td>#<?= (int)$q['quote_number'] ?></td>
                 <td><?= h($q['customer_name']) ?><?php if ($q['company']): ?><br><small class="text-muted"><?= h($q['company']) ?></small><?php endif; ?></td>
-                <td><span class="badge badge-<?= h($q['status']) ?>"><?= ucfirst(h($q['status'])) ?></span></td>
+                <td>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>">
+                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()" style="width:auto">
+                            <?php foreach (['draft'=>'Draft','sent'=>'Sent','ordered'=>'Ordered'] as $val => $label): ?>
+                            <option value="<?= $val ?>" <?= $q['status'] === $val ? 'selected' : '' ?>><?= $label ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                </td>
                 <td><?= date('M j, Y', strtotime($q['created_at'])) ?></td>
                 <td><a href="/inventory/pages/quote-edit.php?id=<?= (int)$q['id'] ?>" class="btn btn-sm btn-outline-secondary">View</a></td>
             </tr>
