@@ -179,12 +179,10 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
         <div style="text-align:right;font-size:8pt;color:#888;margin-top:4px">Plus applicable taxes.</div>
     </div>
 
-    <?php if ($quote['notes']): ?>
     <div class="notes-block">
         <div class="notes-label">Terms</div>
-        <?= nl2br(h($quote['notes'])) ?>
+        <?= nl2br(h($quote['notes'] ?: 'Net 30')) ?>
     </div>
-    <?php endif; ?>
 
     <div class="notes-block" style="margin-top:12px">
         <div class="notes-label">Shipping</div>
