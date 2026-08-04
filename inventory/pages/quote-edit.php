@@ -276,8 +276,8 @@ render_header($page_title, 'quotes');
         </div>
     </div>
     <div class="col-md-7">
-        <label class="form-label fw-semibold">Notes</label>
-        <input type="text" name="notes" class="form-control" value="<?= h($quote['notes'] ?? '') ?>" placeholder="Internal notes (optional)">
+        <label class="form-label fw-semibold">Terms</label>
+        <input type="text" name="notes" class="form-control" value="<?= h($quote['notes'] ?? '') ?>" placeholder="e.g. Net 30">
         <?php if (!empty($quote['po_pdf_path'])): ?>
         <div class="form-text">
             <a href="/inventory/<?= h($quote['po_pdf_path']) ?>" target="_blank">View attached PO PDF</a>

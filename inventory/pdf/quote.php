@@ -121,7 +121,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
             <div class="quote-number">QUOTE #<?= (int)$quote['quote_number'] ?></div>
             <div class="quote-date">Date: <?= date('F j, Y', strtotime($quote['created_at'])) ?></div>
             <div class="quote-date">Expires: <?= date('F j, Y', strtotime($quote['created_at'] . ' +30 days')) ?></div>
-            <div><span class="quote-status status-<?= h($quote['status']) ?>"><?= ucfirst($quote['status']) ?></span></div>
+            <?php if ($quote['status'] !== 'draft'): ?><div><span class="quote-status status-<?= h($quote['status']) ?>"><?= ucfirst($quote['status']) ?></span></div><?php endif; ?>
         </div>
     </div>
 
