@@ -32,6 +32,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg = 'Email already exists.';
             }
         }
+    } elseif (isset($_POST['edit_user'])) {
+        $user_id = (int)$_POST['user_id'];
+        $name    = trim($_POST['name']);
+        $email   = strtolower(trim($_POST['email']));
+        $phone   = trim($_POST['phone'] ?? '');
+        if (!$name || !$email) {
+            $msg = 'Name and email required.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $msg = 'Invalid email.';
+        } else {
+            try {
+                $db->prepare('UPDATE users SET name=?, email=?, phone=? WHERE id=?')
+                   ->execute([$name, $email, $phone ?: null, $user_id]);
+                $msg = 'User updated.';
+            } catch (PDOException $e) {
+                $msg = 'Email already in use.';
+            }
+        }
     } elseif (isset($_POST['reset_password'])) {
         $user_id = (int)$_POST['user_id'];
         $pass    = $_POST['new_password'];
@@ -86,6 +104,9 @@ render_header('Admin — Users', 'admin');
     <td><?= $is_locked ? '<span class="badge bg-danger">Locked</span>' : '<span class="badge bg-success">Active</span>' ?></td>
     <td><?= (int)$u['failed_attempts'] ?></td>
     <td class="text-end">
+        <button class="btn btn-sm btn-outline-primary"
+            onclick="openEdit(<?= htmlspecialchars(json_encode($u), ENT_QUOTES) ?>)"
+            data-bs-toggle="modal" data-bs-target="#editModal">Edit</button>
         <button class="btn btn-sm btn-outline-secondary"
             onclick="openReset(<?= $u['id'] ?>, '<?= h($u['name']) ?>')"
             data-bs-toggle="modal" data-bs-target="#resetModal">Reset PW</button>
@@ -104,6 +125,28 @@ render_header('Admin — Users', 'admin');
 </table>
 </div>
 </div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+<div class="modal-dialog"><div class="modal-content">
+<form method="post">
+<input type="hidden" name="user_id" id="editUserId">
+<div class="modal-header"><h5 class="modal-title">Edit User</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+    <div class="mb-2"><label class="form-label">Name</label>
+        <input type="text" name="name" id="editName" class="form-control" required></div>
+    <div class="mb-2"><label class="form-label">Email</label>
+        <input type="email" name="email" id="editEmail" class="form-control" required></div>
+    <div class="mb-2"><label class="form-label">Phone</label>
+        <input type="text" name="phone" id="editPhone" class="form-control"></div>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" name="edit_user" value="1" class="btn btn-primary">Save</button>
+</div>
+</form>
+</div></div></div>
 
 <!-- Add User Modal -->
 <div class="modal fade" id="addModal" tabindex="-1">
@@ -147,6 +190,12 @@ render_header('Admin — Users', 'admin');
 </div></div></div>
 
 <script>
+function openEdit(u) {
+    document.getElementById('editUserId').value = u.id;
+    document.getElementById('editName').value   = u.name;
+    document.getElementById('editEmail').value  = u.email;
+    document.getElementById('editPhone').value  = u.phone || '';
+}
 function openReset(id, name) {
     document.getElementById('resetUserId').value = id;
     document.getElementById('resetUserName').textContent = name;
