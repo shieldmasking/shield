@@ -60,6 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                ->execute([password_hash($pass, PASSWORD_DEFAULT), $user_id]);
             $msg = 'Password reset.';
         }
+    } elseif (isset($_POST['delete_user'])) {
+        $user_id = (int)$_POST['user_id'];
+        if ($user_id === (int)($_SESSION['user_id'] ?? 0)) {
+            $msg = 'Cannot delete your own account.';
+        } else {
+            $db->prepare('DELETE FROM users WHERE id=?')->execute([$user_id]);
+            $msg = 'User deleted.';
+        }
     } elseif (isset($_POST['toggle_lock'])) {
         $user_id = (int)$_POST['user_id'];
         $lock    = (int)$_POST['lock'];
@@ -118,6 +126,12 @@ render_header('Admin — Users', 'admin');
                 <?= $is_locked ? 'Unlock' : 'Lock' ?>
             </button>
         </form>
+        <?php if ($u['id'] !== (int)($_SESSION['user_id'] ?? 0)): ?>
+        <form method="post" class="d-inline" onsubmit="return confirm('Delete <?= h($u['name']) ?>? This cannot be undone.')">
+            <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
+            <button type="submit" name="delete_user" value="1" class="btn btn-sm btn-outline-danger">Delete</button>
+        </form>
+        <?php endif; ?>
     </td>
 </tr>
 <?php endforeach; ?>
