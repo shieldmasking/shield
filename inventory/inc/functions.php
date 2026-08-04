@@ -124,7 +124,7 @@ function find_or_create_item(PDO $db, string $base_sku, float $width_inches, boo
 
 function next_quote_number(PDO $db): int {
     $row = $db->query('SELECT COALESCE(MAX(quote_number), 0) + 1 AS next FROM quotes')->fetch();
-    return (int)$row['next'];
+    return max((int)$row['next'], 53821);
 }
 
 function get_last_quote_prices(PDO $db, int $customer_id): array {
