@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Change status only
     if ($action === 'status') {
         $new = $_POST['new_status'] ?? '';
-        if ($quote_id && in_array($new, ['sent','expired','rejected'])) {
+        if ($quote_id && in_array($new, ['sent'])) {
             $db->prepare('UPDATE quotes SET status=? WHERE id=?')->execute([$new, $quote_id]);
         }
         header("Location: /inventory/pages/quote-edit.php?id={$quote_id}&msg=Status+updated");
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $db->prepare('UPDATE quotes SET status=\'approved\', po_pdf_path=? WHERE id=?')
+            $db->prepare('UPDATE quotes SET status=\'ordered\', po_pdf_path=? WHERE id=?')
                ->execute([$po_path, $quote_id]);
 
             try {
@@ -183,7 +183,7 @@ $standard_widths = standard_widths(); // 0.125 to 6.0 in 0.125" steps
 $total = array_sum(array_map(fn($r) => $r['quantity'] * $r['unit_price'], $quote_items));
 
 $page_title   = $quote_id ? "Quote #" . $quote['quote_number'] : "New Quote";
-$status_badge = ['draft'=>'secondary','sent'=>'primary','approved'=>'success','expired'=>'warning','rejected'=>'danger'];
+$status_badge = ['draft'=>'secondary','sent'=>'primary','ordered'=>'success'];
 
 render_header($page_title, 'quotes');
 ?>
@@ -366,11 +366,7 @@ render_header($page_title, 'quotes');
     <?php endif; ?>
 
     <?php if ($quote_id && $quote['status'] === 'sent'): ?>
-    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveModal">Approve Order</button>
-    <button type="submit" form="statusForm" name="new_status" value="rejected" class="btn btn-outline-danger"
-            onclick="return confirm('Mark as Rejected?')">Reject</button>
-    <button type="submit" form="statusForm" name="new_status" value="expired" class="btn btn-outline-warning"
-            onclick="return confirm('Mark as Expired?')">Expire</button>
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveModal">Create Order</button>
     <?php endif; ?>
 </div>
 </form>

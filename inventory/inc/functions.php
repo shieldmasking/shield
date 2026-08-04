@@ -125,7 +125,7 @@ function get_last_quote_prices(PDO $db, int $customer_id): array {
         JOIN items i ON i.id = qi.item_id
         JOIN products p ON p.base_sku = i.base_sku
         WHERE q.customer_id = ?
-          AND q.status IN (\'approved\', \'sent\')
+          AND q.status IN (\'ordered\', \'sent\')
         ORDER BY q.created_at DESC
     ';
     $stmt = $db->prepare($sql);

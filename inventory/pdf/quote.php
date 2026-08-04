@@ -64,9 +64,7 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; background:
 .quote-status { display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 3px; font-size: 9pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; }
 .status-draft    { background: #e9ecef; color: #555; }
 .status-sent     { background: #cce5ff; color: #004085; }
-.status-approved { background: #d4edda; color: #155724; }
-.status-expired  { background: #fff3cd; color: #856404; }
-.status-rejected { background: #f8d7da; color: #721c24; }
+.status-ordered  { background: #d4edda; color: #155724; }
 
 /* Addresses */
 .addresses { display: flex; gap: 40px; margin-bottom: 28px; }

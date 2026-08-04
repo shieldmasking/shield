@@ -70,7 +70,7 @@ $search   = trim($_GET['q'] ?? '');
 $where    = ['1=1'];
 $params   = [];
 
-if ($status && in_array($status, ['draft','sent','approved','expired','rejected'])) {
+if ($status && in_array($status, ['draft','sent','ordered'])) {
     $where[]  = 'q.status = ?';
     $params[] = $status;
 }
@@ -94,11 +94,9 @@ $quotes = $stmt->fetchAll();
 $customers = $db->query('SELECT id, name, company FROM customers ORDER BY name')->fetchAll();
 
 $status_badge = [
-    'draft'    => 'secondary',
-    'sent'     => 'primary',
-    'approved' => 'success',
-    'expired'  => 'warning',
-    'rejected' => 'danger',
+    'draft'   => 'secondary',
+    'sent'    => 'primary',
+    'ordered' => 'success',
 ];
 
 render_header('Quotes', 'quotes');
