@@ -5,7 +5,6 @@ function render_header(string $title, string $active = ''): void {
     $nav = [
         'dashboard'  => ['Dashboard',  '/inventory/pages/dashboard.php'],
         'inventory'  => ['Inventory',  '/inventory/pages/inventory.php'],
-        'quotes'     => ['Quotes',     '/inventory/pages/quotes.php'],
         'orders'     => ['Orders',     '/inventory/pages/orders.php'],
         'customers'  => ['Customers',  '/inventory/pages/customers.php'],
         'admin'      => ['Admin',      '/inventory/pages/admin/index.php'],
