@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../inc/auth.php';
 require_once __DIR__ . '/../../inc/functions.php';
 require_once __DIR__ . '/../../inc/layout.php';
 
-require_login();
+require_admin();
 
 $db  = db();
 $msg = '';

@@ -12,7 +12,7 @@ function require_login(): void {
 }
 
 function attempt_login(PDO $db, string $email, string $password): string {
-    $stmt = $db->prepare('SELECT id, password_hash, failed_attempts, locked_until, force_password_change FROM users WHERE email = ?');
+    $stmt = $db->prepare('SELECT id, password_hash, failed_attempts, locked_until, force_password_change, is_admin FROM users WHERE email = ?');
     $stmt->execute([strtolower(trim($email))]);
     $user = $stmt->fetch();
 
@@ -39,8 +39,9 @@ function attempt_login(PDO $db, string $email, string $password): string {
        ->execute([$user['id']]);
 
     session_regenerate_id(true);
-    $_SESSION['user_id']              = $user['id'];
+    $_SESSION['user_id']               = $user['id'];
     $_SESSION['force_password_change'] = (bool)$user['force_password_change'];
+    $_SESSION['is_admin']              = (bool)$user['is_admin'];
     return '';
 }
 
@@ -53,4 +54,16 @@ function logout(): void {
 
 function current_user_id(): int {
     return (int)($_SESSION['user_id'] ?? 0);
+}
+
+function is_admin(): bool {
+    return !empty($_SESSION['is_admin']);
+}
+
+function require_admin(): void {
+    require_login();
+    if (!is_admin()) {
+        header('Location: /inventory/pages/dashboard.php');
+        exit;
+    }
 }

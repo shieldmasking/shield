@@ -10,7 +10,7 @@ render_header('Admin', 'admin');
 <div class="list-group mt-3" style="max-width:400px">
     <a href="/inventory/pages/admin/items.php" class="list-group-item list-group-item-action">Products / SKUs</a>
     <a href="/inventory/pages/admin/width-multipliers.php" class="list-group-item list-group-item-action">Width Multipliers</a>
-    <a href="/inventory/pages/admin/users.php" class="list-group-item list-group-item-action">Users</a>
+    <?php if (is_admin()): ?><a href="/inventory/pages/admin/users.php" class="list-group-item list-group-item-action">Users</a><?php endif; ?>
     <a href="/inventory/pages/admin/settings.php" class="list-group-item list-group-item-action">Settings</a>
 </div>
 <?php render_footer(); ?>

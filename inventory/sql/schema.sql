@@ -28,6 +28,7 @@ CREATE TABLE users (
     failed_attempts       TINYINT UNSIGNED NOT NULL DEFAULT 0,
     locked_until          DATETIME NULL,
     force_password_change TINYINT(1) NOT NULL DEFAULT 0,
+    is_admin              TINYINT(1) NOT NULL DEFAULT 0,
     created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
