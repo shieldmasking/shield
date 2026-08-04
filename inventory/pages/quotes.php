@@ -9,6 +9,62 @@ require_login();
 
 $db = db();
 
+// ── Create quote from uploaded PO ─────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_from_po'])) {
+    $customer_id = (int)($_POST['customer_id'] ?? 0);
+    $notes       = trim($_POST['notes'] ?? '');
+    $errors      = [];
+
+    if (!$customer_id) $errors[] = 'Please select a customer.';
+
+    $po_path = null;
+    if (!empty($_FILES['po_pdf']['tmp_name'])) {
+        $ext = strtolower(pathinfo($_FILES['po_pdf']['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'pdf') {
+            $errors[] = 'File must be a PDF.';
+        } elseif ($_FILES['po_pdf']['size'] > 10 * 1024 * 1024) {
+            $errors[] = 'File exceeds 10MB limit.';
+        } else {
+            $filename = 'uploads/po_cust' . $customer_id . '_' . time() . '.pdf';
+            $dest     = __DIR__ . '/../' . $filename;
+            if (!move_uploaded_file($_FILES['po_pdf']['tmp_name'], $dest)) {
+                $errors[] = 'Upload failed. Check uploads/ directory permissions.';
+            } else {
+                $po_path = $filename;
+            }
+        }
+    }
+
+    if (empty($errors)) {
+        // Create draft quote
+        $qnum = next_quote_number($db);
+        $db->prepare('INSERT INTO quotes (quote_number, customer_id, notes, po_pdf_path, created_by) VALUES (?,?,?,?,?)')
+           ->execute([$qnum, $customer_id, $notes ?: null, $po_path, current_user_id()]);
+        $quote_id = (int)$db->lastInsertId();
+
+        // Pre-fill from customer's last quote
+        $last = get_last_quote_prices($db, $customer_id);
+        if ($last) {
+            $wm   = get_width_multipliers($db);
+            $stmt = $db->prepare('INSERT INTO quote_items (quote_id, item_id, quantity, unit_price) VALUES (?,?,?,?)');
+            foreach ($last as $item_id => $row) {
+                $stmt->execute([$quote_id, $item_id, $row['quantity'], $row['unit_price']]);
+            }
+            $msg_param = 'Quote+created+from+PO+%E2%80%94+prices+carried+from+last+quote.+Review+and+save.';
+        } else {
+            // No prior quote — pre-fill with list prices is not possible without knowing
+            // what was ordered; redirect to editor with a note to add items manually.
+            $msg_param = 'Quote+created+from+PO.+No+prior+quote+found+%E2%80%94+add+line+items+at+list+price.';
+        }
+
+        header("Location: /inventory/pages/quote-edit.php?id={$quote_id}&msg={$msg_param}");
+        exit;
+    }
+
+    // On error, fall through and show the page with $errors
+    $po_errors = $errors;
+}
+
 $status   = $_GET['status'] ?? '';
 $search   = trim($_GET['q'] ?? '');
 $where    = ['1=1'];
@@ -35,6 +91,8 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $quotes = $stmt->fetchAll();
 
+$customers = $db->query('SELECT id, name, company FROM customers ORDER BY name')->fetchAll();
+
 $status_badge = [
     'draft'    => 'secondary',
     'sent'     => 'primary',
@@ -46,9 +104,20 @@ $status_badge = [
 render_header('Quotes', 'quotes');
 ?>
 
+<?php if (!empty($po_errors)): ?>
+<?php foreach ($po_errors as $e): ?>
+<div class="alert alert-danger"><?= h($e) ?></div>
+<?php endforeach; ?>
+<?php endif; ?>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Quotes</h4>
-    <a href="/inventory/pages/quote-edit.php" class="btn btn-primary btn-sm">+ New Quote</a>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#poUploadModal">
+            Upload PO
+        </button>
+        <a href="/inventory/pages/quote-edit.php" class="btn btn-primary btn-sm">+ New Quote</a>
+    </div>
 </div>
 
 <div class="d-flex gap-2 mb-3 flex-wrap">
@@ -98,5 +167,47 @@ render_header('Quotes', 'quotes');
         </table>
     </div>
 </div>
+
+<!-- Upload PO / Create Quote Modal -->
+<div class="modal fade" id="poUploadModal" tabindex="-1">
+<div class="modal-dialog">
+<div class="modal-content">
+<form method="post" enctype="multipart/form-data">
+<div class="modal-header">
+    <h5 class="modal-title">Create Quote from Customer PO</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+    <div class="alert alert-info py-2 small">
+        Line items will be pre-loaded from the customer's most recent quote.
+        If no prior quote exists, you'll add items manually in the editor.
+    </div>
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Customer <span class="text-danger">*</span></label>
+        <select name="customer_id" class="form-select" required>
+            <option value="">Select customer...</option>
+            <?php foreach ($customers as $c): ?>
+            <option value="<?= $c['id'] ?>">
+                <?= h($c['name']) ?><?= $c['company'] ? ' — ' . h($c['company']) : '' ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Customer PO (PDF) <span class="text-danger">*</span></label>
+        <input type="file" name="po_pdf" class="form-control" accept=".pdf" required>
+        <div class="form-text">Max 10MB.</div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" name="notes" class="form-control" placeholder="e.g. Rush order, special instructions">
+    </div>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" name="create_from_po" value="1" class="btn btn-primary">Create Quote</button>
+</div>
+</form>
+</div></div></div>
 
 <?php render_footer(); ?>
