@@ -1,5 +1,4 @@
 <?php
-ob_start();
 session_start();
 
 if (!empty($_SESSION['user_id'])) {
