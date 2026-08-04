@@ -236,11 +236,10 @@ render_header($page_title, 'quotes');
 <div class="card-header fw-semibold">Line Items</div>
 <div class="card-body p-0">
 <table class="table mb-0">
-<thead><tr><th>SKU</th><th>Item</th><th>Width</th><th>Length</th><th>Qty</th><th>Unit Price</th><th class="text-end">Total</th></tr></thead>
+<thead><tr><th>Product</th><th>Width</th><th>Length</th><th>Qty</th><th>Unit Price</th><th class="text-end">Total</th></tr></thead>
 <tbody>
 <?php foreach ($quote_items as $li): ?>
 <tr>
-    <td><?= h($li['sku']) ?></td>
     <td><?= h($li['item_name']) ?></td>
     <td><?= width_label($li) ?></td>
     <td><?= (int)$li['roll_length_yards'] ?>yds</td>
@@ -251,7 +250,7 @@ render_header($page_title, 'quotes');
 <?php endforeach; ?>
 </tbody>
 <tfoot><tr>
-    <td colspan="6" class="text-end fw-bold">Total</td>
+    <td colspan="5" class="text-end fw-bold">Total</td>
     <td class="text-end fw-bold"><?= currency($total) ?></td>
 </tr></tfoot>
 </table>
@@ -303,7 +302,7 @@ render_header($page_title, 'quotes');
 <div class="table-responsive">
 <table class="table mb-0 align-middle" id="lineItemsTable">
 <thead><tr>
-    <th style="min-width:140px">Base SKU</th>
+    <th style="min-width:140px">Product</th>
     <th style="min-width:140px">Width</th>
     <th style="width:80px">Length</th>
     <th style="width:80px">Qty</th>
@@ -321,7 +320,7 @@ render_header($page_title, 'quotes');
                 data-fixed="<?= $bdata['is_fixed_width'] ?>"
                 data-len="<?= $bdata['roll_length_yards'] ?>"
                 <?= $bsku === $li['base_sku'] ? 'selected' : '' ?>>
-                <?= h($bsku) ?>
+                <?= h($bdata['name']) ?>
             </option>
             <?php endforeach; ?>
         </select>
@@ -439,7 +438,7 @@ let rowCounter  = 1000;
 
 function skuOpts(selectedSku) {
     return BASE_SKUS.map(b =>
-        `<option value="${b.base_sku}" data-fixed="${b.is_fixed_width}" data-len="${b.roll_length_yards}"${b.base_sku === selectedSku ? ' selected' : ''}>${b.base_sku}</option>`
+        `<option value="${b.base_sku}" data-fixed="${b.is_fixed_width}" data-len="${b.roll_length_yards}"${b.base_sku === selectedSku ? ' selected' : ''}>${b.name}</option>`
     ).join('');
 }
 
