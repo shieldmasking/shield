@@ -121,6 +121,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
         <div class="quote-meta">
             <div class="quote-number">QUOTE #<?= (int)$quote['quote_number'] ?></div>
             <div class="quote-date">Date: <?= date('F j, Y', strtotime($quote['created_at'])) ?></div>
+            <div class="quote-date">Expires: <?= date('F j, Y', strtotime($quote['created_at'] . ' +30 days')) ?></div>
             <div><span class="quote-status status-<?= h($quote['status']) ?>"><?= ucfirst($quote['status']) ?></span></div>
         </div>
     </div>
@@ -188,7 +189,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
 
     <div class="footer">
         <div><?= h($company_name) ?> &mdash; shieldmasking.com</div>
-        <div>Quote valid for 30 days from date of issue.</div>
+        <div>Valid through <?= date('F j, Y', strtotime($quote['created_at'] . ' +30 days')) ?>.</div>
     </div>
 
 </div>
