@@ -113,8 +113,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
     <div class="header">
         <div>
             <div class="company-name"><?= h($company_name) ?></div>
-            <div class="company-sub">Thermal Spray Masking Products</div>
-            <?php if ($company_address): ?><div class="company-sub" style="margin-top:4px"><?= nl2br(h($company_address)) ?></div><?php endif; ?>
+<?php if ($company_address): ?><div class="company-sub" style="margin-top:4px"><?= nl2br(h($company_address)) ?></div><?php endif; ?>
             <?php if ($company_phone): ?><div class="company-sub"><?= h($company_phone) ?></div><?php endif; ?>
             <?php if ($company_email): ?><div class="company-sub"><?= h($company_email) ?></div><?php endif; ?>
         </div>
