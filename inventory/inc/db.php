@@ -1,6 +1,4 @@
 <?php
-ob_start();
-
 function db(): PDO {
     static $pdo = null;
     if ($pdo === null) {
