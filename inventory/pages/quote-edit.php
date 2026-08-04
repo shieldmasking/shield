@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $qnum = next_quote_number($db);
                 $db->prepare('INSERT INTO quotes (quote_number, customer_id, notes, created_by) VALUES (?,?,?,?)')
-                   ->execute([$qnum, $customer_id, $notes ?: null, current_user_id()]);
+                   ->execute([$qnum, $customer_id, $notes ?: 'Net 30', current_user_id()]);
                 $quote_id = (int)$db->lastInsertId();
             }
 
@@ -277,7 +277,7 @@ render_header($page_title, 'quotes');
     </div>
     <div class="col-md-7">
         <label class="form-label fw-semibold">Terms</label>
-        <input type="text" name="notes" class="form-control" value="<?= h($quote['notes'] ?? '') ?>" placeholder="e.g. Net 30">
+        <input type="text" name="notes" class="form-control" value="<?= h($quote['notes'] ?? 'Net 30') ?>" placeholder="e.g. Net 30">
         <?php if (!empty($quote['po_pdf_path'])): ?>
         <div class="form-text">
             <a href="/inventory/<?= h($quote['po_pdf_path']) ?>" target="_blank">View attached PO PDF</a>
