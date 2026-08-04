@@ -188,7 +188,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
 
     <div class="notes-block" style="margin-top:12px">
         <div class="notes-label">Shipping &amp; Terms</div>
-        FOB Origin. Shipping included on orders over $5,000.
+        FOB Origin. Shipping included on orders over $5,000 (Continental US only).
     </div>
 
     <div class="footer">
