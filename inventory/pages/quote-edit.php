@@ -373,7 +373,6 @@ render_header($page_title, 'quotes');
 
 <form method="post" id="statusForm">
     <input type="hidden" name="action" value="status">
-    <input type="hidden" name="new_status" value="">
 </form>
 
 <?php endif; // end editable ?>
