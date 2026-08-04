@@ -94,26 +94,17 @@ function find_or_create_item(PDO $db, string $base_sku, float $width_inches, boo
     $row = $stmt->fetch();
     if ($row) return (int)$row['id'];
 
-    // Copy base properties from any existing row for this base_sku
-    $tmpl = $db->prepare('SELECT * FROM items WHERE base_sku = ? LIMIT 1');
+    // Verify base_sku exists in products
+    $tmpl = $db->prepare('SELECT base_sku FROM products WHERE base_sku = ?');
     $tmpl->execute([$base_sku]);
-    $tmpl = $tmpl->fetch();
-    if (!$tmpl) return 0; // Unknown base_sku
+    if (!$tmpl->fetch()) return 0; // Unknown base_sku
 
     $sku = make_item_sku($base_sku, $width_inches, $is_log);
 
     $db->prepare('
-        INSERT INTO items
-            (base_sku, sku, name, category_id, coo, factory_product_num,
-             thickness_mm, roll_length_yards, width_inches, is_log, is_fixed_width,
-             land_cost_base, markup_multiplier, quantity_on_hand, reorder_threshold, is_active)
-        VALUES (?,?,?,?,?,?,?,?,?,?,0,?,?,0,0,1)
-    ')->execute([
-        $base_sku, $sku, $tmpl['name'], $tmpl['category_id'], $tmpl['coo'],
-        $tmpl['factory_product_num'], $tmpl['thickness_mm'], $tmpl['roll_length_yards'],
-        $width_inches, $is_log ? 1 : 0,
-        $tmpl['land_cost_base'], $tmpl['markup_multiplier'],
-    ]);
+        INSERT INTO items (base_sku, sku, width_inches, is_active)
+        VALUES (?,?,?,1)
+    ')->execute([$base_sku, $sku, $width_inches]);
 
     return (int)$db->lastInsertId();
 }
@@ -128,10 +119,11 @@ function next_quote_number(PDO $db): int {
 function get_last_quote_prices(PDO $db, int $customer_id): array {
     $sql = '
         SELECT qi.item_id, qi.unit_price, qi.quantity,
-               i.base_sku, i.sku, i.name AS item_name, i.width_inches, i.is_log, i.is_fixed_width
+               i.base_sku, i.sku, p.name AS item_name, i.width_inches, p.is_log, p.is_fixed_width
         FROM quote_items qi
         JOIN quotes q ON q.id = qi.quote_id
         JOIN items i ON i.id = qi.item_id
+        JOIN products p ON p.base_sku = i.base_sku
         WHERE q.customer_id = ?
           AND q.status IN (\'approved\', \'sent\')
         ORDER BY q.created_at DESC
@@ -171,7 +163,11 @@ function adjust_inventory(PDO $db, int $item_id, float $change_qty, string $reas
 }
 
 function check_low_stock(PDO $db, int $item_id): void {
-    $item = $db->prepare('SELECT sku, name, quantity_on_hand, reorder_threshold FROM items WHERE id = ?');
+    $item = $db->prepare('
+        SELECT i.sku, p.name, i.quantity_on_hand, i.reorder_threshold
+        FROM items i JOIN products p ON p.base_sku = i.base_sku
+        WHERE i.id = ?
+    ');
     $item->execute([$item_id]);
     $item = $item->fetch();
 

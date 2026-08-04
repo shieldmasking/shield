@@ -10,22 +10,43 @@ require_login();
 $db  = db();
 $msg = '';
 
-// Save base SKU pricing (applies land_cost + markup to all widths of that base_sku)
+// ── POST handlers ─────────────────────────────────────────────────────────────
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     if (isset($_POST['save_base'])) {
         $base_sku  = strtoupper(trim($_POST['base_sku']));
+        $name      = trim($_POST['name']);
+        $desc      = trim($_POST['description']);
         $land_cost = (float)$_POST['land_cost_base'];
         $markup    = (float)$_POST['markup_multiplier'];
-        $name      = trim($_POST['name']);
 
-        $db->prepare('UPDATE items SET land_cost_base=?, markup_multiplier=?, name=? WHERE base_sku=?')
-           ->execute([$land_cost, $markup, $name, $base_sku]);
-        $msg = "Pricing updated for all {$base_sku} widths.";
+        // Handle datasheet upload
+        $datasheet_path = null;
+        if (!empty($_FILES['datasheet']['tmp_name'])) {
+            $ext = strtolower(pathinfo($_FILES['datasheet']['name'], PATHINFO_EXTENSION));
+            if ($ext === 'pdf' && $_FILES['datasheet']['size'] <= 10 * 1024 * 1024) {
+                $dir = __DIR__ . '/../../uploads/datasheets/';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $dest = $dir . $base_sku . '.pdf';
+                if (move_uploaded_file($_FILES['datasheet']['tmp_name'], $dest)) {
+                    $datasheet_path = 'uploads/datasheets/' . $base_sku . '.pdf';
+                }
+            }
+        }
+
+        if ($datasheet_path !== null) {
+            $db->prepare('UPDATE products SET name=?, description=?, land_cost_base=?, markup_multiplier=?, datasheet_path=? WHERE base_sku=?')
+               ->execute([$name, $desc ?: null, $land_cost, $markup, $datasheet_path, $base_sku]);
+        } else {
+            $db->prepare('UPDATE products SET name=?, description=?, land_cost_base=?, markup_multiplier=? WHERE base_sku=?')
+               ->execute([$name, $desc ?: null, $land_cost, $markup, $base_sku]);
+        }
+        $msg = "Pricing updated for {$base_sku}.";
 
     } elseif (isset($_POST['save_row'])) {
-        // Per-row: reorder threshold + active flag
-        $id       = (int)$_POST['id'];
-        $reorder  = (int)$_POST['reorder_threshold'];
+        $id        = (int)$_POST['id'];
+        $reorder   = (int)$_POST['reorder_threshold'];
         $is_active = isset($_POST['is_active']) ? 1 : 0;
 
         $db->prepare('UPDATE items SET reorder_threshold=?, is_active=? WHERE id=?')
@@ -33,9 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = 'Item updated.';
 
     } elseif (isset($_POST['add_base'])) {
-        // Add a new base SKU (creates the 1" template row)
         $base_sku   = strtoupper(trim($_POST['base_sku']));
         $name       = trim($_POST['name']);
+        $desc       = trim($_POST['description']);
         $cat_id     = (int)$_POST['category_id'];
         $coo        = strtoupper(trim($_POST['coo']));
         $factory    = trim($_POST['factory_product_num']);
@@ -47,25 +68,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fixed_w    = $is_fixed ? (float)$_POST['fixed_width_inches'] : 1.0;
         $sku        = make_item_sku($base_sku, $fixed_w, false);
 
-        $db->prepare('INSERT INTO items
-            (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm,
-             roll_length_yards, width_inches, is_log, is_fixed_width, land_cost_base, markup_multiplier)
-            VALUES (?,?,?,?,?,?,?,?,?,0,?,?,?)')
-           ->execute([$base_sku, $sku, $name, $cat_id, $coo, $factory, $thick,
-                      $roll_len, $fixed_w, $is_fixed, $land_cost, $markup]);
+        $db->prepare('INSERT INTO products
+            (base_sku, name, description, category_id, coo, factory_product_num, thickness_mm,
+             roll_length_yards, is_log, is_fixed_width, land_cost_base, markup_multiplier)
+            VALUES (?,?,?,?,?,?,?,?,0,?,?,?)')
+           ->execute([$base_sku, $name, $desc ?: null, $cat_id, $coo, $factory, $thick,
+                      $roll_len, $is_fixed, $land_cost, $markup]);
+
+        $db->prepare('INSERT INTO items (base_sku, sku, width_inches, is_active) VALUES (?,?,?,1)')
+           ->execute([$base_sku, $sku, $fixed_w]);
+
         $msg = "Base SKU {$base_sku} added.";
     }
 }
 
-// Load all items grouped by base_sku
-$items_raw  = $db->query('SELECT i.*, c.name AS cat_name FROM items i JOIN categories c ON c.id=i.category_id ORDER BY i.base_sku, i.is_log, i.width_inches')->fetchAll();
+// ── Load data ─────────────────────────────────────────────────────────────────
+
+$products   = $db->query('SELECT p.*, c.name AS cat_name FROM products p JOIN categories c ON c.id=p.category_id ORDER BY p.base_sku')->fetchAll();
 $categories = $db->query('SELECT * FROM categories ORDER BY name')->fetchAll();
 $wm         = get_width_multipliers($db);
 
-// Group by base_sku
-$grouped = [];
+// Load all items and group by base_sku
+$items_raw = $db->query('SELECT * FROM items ORDER BY base_sku, width_inches')->fetchAll();
+$item_rows = [];
 foreach ($items_raw as $item) {
-    $grouped[$item['base_sku']][] = $item;
+    $item_rows[$item['base_sku']][] = $item;
 }
 
 render_header('Admin — Products', 'admin');
@@ -83,25 +110,29 @@ render_header('Admin — Products', 'admin');
 <div class="alert alert-success alert-dismissible fade show"><?= h($msg) ?> <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 <?php endif; ?>
 
-<?php foreach ($grouped as $base_sku => $rows):
-    $first = $rows[0]; // Use first row for base properties
-    $sell1 = currency(round($first['land_cost_base'] * $first['markup_multiplier'], 2));
+<?php foreach ($products as $prod):
+    $rows = $item_rows[$prod['base_sku']] ?? [];
+    $sell1 = currency(round($prod['land_cost_base'] * $prod['markup_multiplier'], 2));
 ?>
 <div class="card mb-3">
 <div class="card-header d-flex justify-content-between align-items-center">
     <div>
-        <strong><?= h($base_sku) ?></strong>
-        <span class="text-muted ms-2"><?= h($first['name']) ?></span>
-        <span class="badge bg-secondary ms-2"><?= h($first['cat_name']) ?></span>
+        <strong><?= h($prod['base_sku']) ?></strong>
+        <span class="text-muted ms-2"><?= h($prod['name']) ?></span>
+        <span class="badge bg-secondary ms-2"><?= h($prod['cat_name']) ?></span>
+        <?php if ($prod['datasheet_path']): ?>
+        <a href="/inventory/<?= h($prod['datasheet_path']) ?>" target="_blank" class="ms-2 small">Datasheet</a>
+        <?php endif; ?>
     </div>
     <div class="d-flex align-items-center gap-3">
-        <small class="text-muted">1" base: <?= currency((float)$first['land_cost_base']) ?> &times; <?= number_format((float)$first['markup_multiplier'], 4) ?> = <?= $sell1 ?>/roll</small>
+        <small class="text-muted">1" base: <?= currency((float)$prod['land_cost_base']) ?> &times; <?= number_format((float)$prod['markup_multiplier'], 4) ?> = <?= $sell1 ?>/roll</small>
         <button class="btn btn-sm btn-outline-primary"
             onclick="openBaseEdit(<?= htmlspecialchars(json_encode([
-                'base_sku'          => $first['base_sku'],
-                'name'              => $first['name'],
-                'land_cost_base'    => $first['land_cost_base'],
-                'markup_multiplier' => $first['markup_multiplier'],
+                'base_sku'          => $prod['base_sku'],
+                'name'              => $prod['name'],
+                'description'       => $prod['description'] ?? '',
+                'land_cost_base'    => $prod['land_cost_base'],
+                'markup_multiplier' => $prod['markup_multiplier'],
             ]), ENT_QUOTES) ?>)"
             data-bs-toggle="modal" data-bs-target="#editBaseModal">
             Edit Pricing
@@ -115,16 +146,18 @@ render_header('Admin — Products', 'admin');
 </tr></thead>
 <tbody>
 <?php foreach ($rows as $item):
-    $sell = $item['is_log']
-        ? currency(round($item['land_cost_base'] * $item['width_inches'] * $item['markup_multiplier'], 2))
-        : ($item['is_fixed_width']
-            ? currency(round($item['land_cost_base'] * $item['markup_multiplier'], 2))
-            : currency(calculate_sell_price($item, $wm)));
+    // Merge product fields for pricing calculation
+    $merged = array_merge($prod, $item);
+    $sell = $prod['is_log']
+        ? currency(round($prod['land_cost_base'] * $item['width_inches'] * $prod['markup_multiplier'], 2))
+        : ($prod['is_fixed_width']
+            ? currency(round($prod['land_cost_base'] * $prod['markup_multiplier'], 2))
+            : currency(calculate_sell_price($merged, $wm)));
 ?>
 <tr class="<?= !$item['is_active'] ? 'table-secondary text-muted' : '' ?>">
     <td class="fw-semibold"><?= h($item['sku']) ?></td>
-    <td><?= width_label($item) ?></td>
-    <td><?= (int)$item['roll_length_yards'] ?>yds</td>
+    <td><?= width_label($merged) ?></td>
+    <td><?= (int)$prod['roll_length_yards'] ?>yds</td>
     <td><?= $sell ?></td>
     <td><?= (int)$item['quantity_on_hand'] ?></td>
     <td><?= $item['reorder_threshold'] > 0 ? (int)$item['reorder_threshold'] : '—' ?></td>
@@ -141,6 +174,9 @@ render_header('Admin — Products', 'admin');
     </td>
 </tr>
 <?php endforeach; ?>
+<?php if (empty($rows)): ?>
+<tr><td colspan="8" class="text-muted text-center py-2">No width rows yet.</td></tr>
+<?php endif; ?>
 </tbody>
 </table>
 </div>
@@ -151,7 +187,7 @@ render_header('Admin — Products', 'admin');
 <div class="modal fade" id="editBaseModal" tabindex="-1">
 <div class="modal-dialog">
 <div class="modal-content">
-<form method="post">
+<form method="post" enctype="multipart/form-data">
 <input type="hidden" name="base_sku" id="editBaseSku">
 <div class="modal-header"><h5 class="modal-title">Edit Pricing — <span id="editBaseSkuLabel"></span></h5>
 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -162,13 +198,22 @@ render_header('Admin — Products', 'admin');
             <label class="form-label">Product Name</label>
             <input type="text" name="name" id="editBaseName" class="form-control" required>
         </div>
+        <div class="col-12">
+            <label class="form-label">Description</label>
+            <textarea name="description" id="editBaseDescription" class="form-control" rows="2" placeholder="Optional product description shown on quotes"></textarea>
+        </div>
         <div class="col-md-6">
             <label class="form-label">1" Land Cost ($)</label>
-            <input type="number" name="land_cost_base" id="editBaseLandCost" class="form-control" step="0.01" min="0" required>
+            <input type="number" name="land_cost_base" id="editBaseLandCost" class="form-control" step="0.0001" min="0" required>
         </div>
         <div class="col-md-6">
             <label class="form-label">Markup Multiplier</label>
             <input type="number" name="markup_multiplier" id="editBaseMarkup" class="form-control" step="0.0001" min="1" required>
+        </div>
+        <div class="col-12">
+            <label class="form-label">Datasheet PDF</label>
+            <input type="file" name="datasheet" class="form-control" accept=".pdf">
+            <div class="form-text">Upload a new PDF to replace the existing datasheet. Max 10MB.</div>
         </div>
     </div>
 </div>
@@ -227,16 +272,18 @@ render_header('Admin — Products', 'admin');
                 <option value="<?= $cat['id'] ?>"><?= h($cat['name']) ?></option>
                 <?php endforeach; ?>
             </select></div>
+        <div class="col-12"><label class="form-label">Description (optional)</label>
+            <textarea name="description" class="form-control" rows="2"></textarea></div>
         <div class="col-md-2"><label class="form-label">COO</label>
             <input type="text" name="coo" class="form-control" maxlength="2" placeholder="TW" required></div>
         <div class="col-md-4"><label class="form-label">Factory Product #</label>
             <input type="text" name="factory_product_num" class="form-control"></div>
         <div class="col-md-2"><label class="form-label">Thickness (mm)</label>
-            <input type="number" name="thickness_mm" class="form-control" step="0.01"></div>
+            <input type="number" name="thickness_mm" class="form-control" step="0.001"></div>
         <div class="col-md-2"><label class="form-label">Roll Length (yds)</label>
             <input type="number" name="roll_length_yards" class="form-control" step="0.01" required></div>
         <div class="col-md-3"><label class="form-label">1" Land Cost ($)</label>
-            <input type="number" name="land_cost_base" class="form-control" step="0.01" min="0" required></div>
+            <input type="number" name="land_cost_base" class="form-control" step="0.0001" min="0" required></div>
         <div class="col-md-3"><label class="form-label">Markup Multiplier</label>
             <input type="number" name="markup_multiplier" class="form-control" step="0.0001" value="2.1900" required></div>
         <div class="col-md-4 d-flex align-items-end gap-2">
@@ -261,17 +308,18 @@ render_header('Admin — Products', 'admin');
 
 <script>
 function openBaseEdit(data) {
-    document.getElementById('editBaseSku').value       = data.base_sku;
+    document.getElementById('editBaseSku').value            = data.base_sku;
     document.getElementById('editBaseSkuLabel').textContent = data.base_sku;
-    document.getElementById('editBaseName').value      = data.name;
-    document.getElementById('editBaseLandCost').value  = data.land_cost_base;
-    document.getElementById('editBaseMarkup').value    = data.markup_multiplier;
+    document.getElementById('editBaseName').value           = data.name;
+    document.getElementById('editBaseDescription').value    = data.description || '';
+    document.getElementById('editBaseLandCost').value       = data.land_cost_base;
+    document.getElementById('editBaseMarkup').value         = data.markup_multiplier;
 }
 function openRowEdit(data) {
-    document.getElementById('editRowId').value       = data.id;
+    document.getElementById('editRowId').value        = data.id;
     document.getElementById('editRowSku').textContent = data.sku;
-    document.getElementById('editRowReorder').value  = data.reorder_threshold;
-    document.getElementById('editRowActive').checked = data.is_active == 1;
+    document.getElementById('editRowReorder').value   = data.reorder_threshold;
+    document.getElementById('editRowActive').checked  = data.is_active == 1;
 }
 function toggleFixedWidth(cb) {
     document.getElementById('fixedWidthField').style.display = cb.checked ? '' : 'none';

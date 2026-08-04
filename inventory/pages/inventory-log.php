@@ -17,9 +17,10 @@ if ($item_id) {
     $params[] = $item_id;
 }
 
-$sql = 'SELECT l.*, i.sku, i.name AS item_name, u.name AS user_name
+$sql = 'SELECT l.*, i.sku, p.name AS item_name, u.name AS user_name
         FROM inventory_log l
         JOIN items i ON i.id = l.item_id
+        JOIN products p ON p.base_sku = i.base_sku
         JOIN users u ON u.id = l.created_by'
     . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
     . ' ORDER BY l.created_at DESC LIMIT 500';
@@ -30,7 +31,7 @@ $logs = $stmt->fetchAll();
 
 $item_name = '';
 if ($item_id) {
-    $row = $db->prepare('SELECT sku, name FROM items WHERE id = ?');
+    $row = $db->prepare('SELECT i.sku, p.name FROM items i JOIN products p ON p.base_sku = i.base_sku WHERE i.id = ?');
     $row->execute([$item_id]);
     $row = $row->fetch();
     if ($row) $item_name = $row['sku'] . ' — ' . $row['name'];

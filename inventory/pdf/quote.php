@@ -22,10 +22,11 @@ $quote = $stmt->fetch();
 if (!$quote) { header('Location: /inventory/pages/quotes.php'); exit; }
 
 $items_stmt = $db->prepare('
-    SELECT qi.*, i.sku, i.name AS item_name, i.roll_length_yards,
-           i.width_inches, i.is_log, i.is_fixed_width
+    SELECT qi.*, i.sku, i.width_inches,
+           p.name AS item_name, p.roll_length_yards, p.description, p.is_log, p.is_fixed_width
     FROM quote_items qi
     JOIN items i ON i.id = qi.item_id
+    JOIN products p ON p.base_sku = i.base_sku
     WHERE qi.quote_id = ?
     ORDER BY qi.id
 ');
@@ -147,20 +148,19 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
             <tr>
                 <th style="width:80px">SKU</th>
                 <th>Description</th>
-                <th style="width:60px">Width</th>
-                <th style="width:60px">Length</th>
                 <th class="right" style="width:50px">Qty</th>
                 <th class="right" style="width:90px">Unit Price</th>
                 <th class="right" style="width:90px">Total</th>
             </tr>
         </thead>
         <tbody>
-        <?php foreach ($line_items as $li): ?>
+        <?php foreach ($line_items as $li):
+            $desc = width_label($li) . ' x ' . (int)$li['roll_length_yards'] . 'yds'
+                  . ($li['description'] ? ' ' . $li['description'] : '');
+        ?>
         <tr>
             <td><strong><?= h($li['sku']) ?></strong></td>
-            <td><?= h($li['item_name']) ?></td>
-            <td><?= width_label($li) ?></td>
-            <td><?= (int)$li['roll_length_yards'] ?>yds</td>
+            <td><?= h($li['item_name']) ?><br><span style="font-size:9pt;color:#555"><?= h($desc) ?></span></td>
             <td class="right"><?= (int)$li['quantity'] ?></td>
             <td class="right"><?= currency((float)$li['unit_price']) ?></td>
             <td class="right"><?= currency($li['quantity'] * $li['unit_price']) ?></td>

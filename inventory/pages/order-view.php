@@ -25,10 +25,11 @@ $order = $stmt->fetch();
 if (!$order) { header('Location: /inventory/pages/orders.php'); exit; }
 
 $items_stmt = $db->prepare('
-    SELECT oi.*, i.sku, i.name AS item_name, i.roll_length_yards,
-           i.width_inches, i.is_log, i.is_fixed_width
+    SELECT oi.*, i.sku, i.width_inches,
+           p.name AS item_name, p.roll_length_yards, p.description, p.is_log, p.is_fixed_width
     FROM order_items oi
     JOIN items i ON i.id = oi.item_id
+    JOIN products p ON p.base_sku = i.base_sku
     WHERE oi.order_id = ?
     ORDER BY oi.id
 ');

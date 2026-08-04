@@ -18,8 +18,8 @@ if (!$base_sku || $width <= 0) {
 
 $db = db();
 
-// Get base properties from any existing row for this base_sku
-$stmt = $db->prepare('SELECT * FROM items WHERE base_sku = ? AND is_active = 1 LIMIT 1');
+// Get base properties from products table
+$stmt = $db->prepare('SELECT * FROM products WHERE base_sku = ?');
 $stmt->execute([$base_sku]);
 $base = $stmt->fetch();
 
@@ -31,9 +31,8 @@ if (!$base) {
 
 // Build a synthetic item row using the requested width for pricing
 $item = $base;
-$item['width_inches']   = $width;
-$item['is_log']         = 0;
-$item['is_fixed_width'] = $base['is_fixed_width'];
+$item['width_inches'] = $width;
+$item['is_log']       = 0;
 
 $wm = get_width_multipliers($db);
 echo json_encode([

@@ -67,22 +67,23 @@ if ($filter === 'low_stock') {
     $where[] = 'i.reorder_threshold > 0 AND i.quantity_on_hand <= i.reorder_threshold';
 }
 if ($cat_id) {
-    $where[] = 'i.category_id = ?';
+    $where[] = 'p.category_id = ?';
     $params[] = $cat_id;
 }
 
-$sql = 'SELECT i.*, c.name AS category_name
+$sql = 'SELECT i.*, p.name, p.roll_length_yards, p.is_log, p.is_fixed_width, p.description, c.name AS category_name
         FROM items i
-        JOIN categories c ON c.id = i.category_id
+        JOIN products p ON p.base_sku = i.base_sku
+        JOIN categories c ON c.id = p.category_id
         WHERE ' . implode(' AND ', $where) . '
-        ORDER BY i.base_sku, i.is_log, i.width_inches';
+        ORDER BY i.base_sku, p.is_log, i.width_inches';
 
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $items = $stmt->fetchAll();
 
 // Base SKUs for the receive-new-width modal
-$base_skus = $db->query('SELECT DISTINCT base_sku FROM items WHERE is_active=1 ORDER BY base_sku')->fetchAll(PDO::FETCH_COLUMN);
+$base_skus = $db->query('SELECT DISTINCT base_sku FROM products ORDER BY base_sku')->fetchAll(PDO::FETCH_COLUMN);
 
 $categories = $db->query('SELECT * FROM categories ORDER BY name')->fetchAll();
 $standard_widths = standard_widths();

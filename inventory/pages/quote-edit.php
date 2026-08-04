@@ -24,10 +24,11 @@ if ($quote_id) {
     if (!$quote) { header('Location: /inventory/pages/quotes.php'); exit; }
 
     $stmt = $db->prepare('
-        SELECT qi.*, i.base_sku, i.sku, i.name AS item_name, i.width_inches,
-               i.is_log, i.is_fixed_width, i.roll_length_yards
+        SELECT qi.*, i.base_sku, i.sku, i.width_inches,
+               p.name AS item_name, p.roll_length_yards, p.description, p.is_log, p.is_fixed_width
         FROM quote_items qi
         JOIN items i ON i.id = qi.item_id
+        JOIN products p ON p.base_sku = i.base_sku
         WHERE qi.quote_id = ?
         ORDER BY qi.id
     ');
@@ -101,9 +102,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $stmt = $db->prepare('
-            SELECT qi.*, i.base_sku, i.sku, i.name AS item_name, i.width_inches,
-                   i.is_log, i.is_fixed_width, i.roll_length_yards
-            FROM quote_items qi JOIN items i ON i.id = qi.item_id
+            SELECT qi.*, i.base_sku, i.sku, i.width_inches,
+                   p.name AS item_name, p.roll_length_yards, p.description, p.is_log, p.is_fixed_width
+            FROM quote_items qi
+            JOIN items i ON i.id = qi.item_id
+            JOIN products p ON p.base_sku = i.base_sku
             WHERE qi.quote_id = ? ORDER BY qi.id
         ');
         $stmt->execute([$quote_id]);
@@ -164,8 +167,9 @@ $customers = $db->query('SELECT id, name, company FROM customers ORDER BY name')
 
 // Distinct base SKUs (one row per base_sku for metadata)
 $base_skus_raw = $db->query('
-    SELECT DISTINCT base_sku, name, roll_length_yards, is_fixed_width
-    FROM items WHERE is_active = 1
+    SELECT base_sku, name, description, roll_length_yards, is_fixed_width
+    FROM products
+    WHERE base_sku IN (SELECT DISTINCT base_sku FROM items WHERE is_active = 1)
     ORDER BY base_sku
 ')->fetchAll();
 $base_skus = [];

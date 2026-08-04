@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS quote_items;
 DROP TABLE IF EXISTS quotes;
 DROP TABLE IF EXISTS inventory_log;
 DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS width_multipliers;
@@ -48,104 +49,112 @@ INSERT INTO categories (name) VALUES
     ('Silicone Rubber Blasting Tape');
 
 -- --------------------------------------------------------
+-- Products — one row per base_sku (base-level properties)
+-- --------------------------------------------------------
+CREATE TABLE products (
+    base_sku            VARCHAR(20)   NOT NULL,
+    name                VARCHAR(150)  NOT NULL,
+    description         TEXT          NULL,
+    datasheet_path      VARCHAR(255)  NULL,
+    category_id         INT           NOT NULL,
+    coo                 CHAR(2)       NOT NULL DEFAULT 'TW',
+    factory_product_num VARCHAR(50)   NULL,
+    thickness_mm        DECIMAL(6,3)  NULL,
+    roll_length_yards   DECIMAL(8,2)  NOT NULL,
+    is_log              TINYINT(1)    NOT NULL DEFAULT 0,
+    is_fixed_width      TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '1 = no slitting (1000X)',
+    land_cost_base      DECIMAL(10,4) NOT NULL DEFAULT 0 COMMENT '1" land cost for this base_sku',
+    markup_multiplier   DECIMAL(8,4)  NOT NULL DEFAULT 2.1900,
+    PRIMARY KEY (base_sku),
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
 -- Items — one row per base_sku + width combination (sparse)
 --
 -- Rows are created on demand via find_or_create_item().
 -- base_sku + width_inches must be unique.
--- land_cost_base and markup_multiplier are per base_sku
--- (denormalized for simplicity); editing them in admin
--- updates all rows sharing the same base_sku.
 -- --------------------------------------------------------
 CREATE TABLE items (
     id                  INT AUTO_INCREMENT PRIMARY KEY,
-    base_sku            VARCHAR(20)  NOT NULL,
-    sku                 VARCHAR(30)  NOT NULL UNIQUE COMMENT 'e.g. 730D-1, 730D-0125, 730D-L22.8',
-    name                VARCHAR(150) NOT NULL,
-    category_id         INT NOT NULL,
-    coo                 CHAR(2) NOT NULL,
-    factory_product_num VARCHAR(50) NULL,
-    thickness_mm        DECIMAL(4,2) NULL,
-    roll_length_yards   DECIMAL(6,2) NOT NULL,
-    width_inches        DECIMAL(6,3) NOT NULL COMMENT 'Slit width or full log width',
-    is_log              TINYINT(1)  NOT NULL DEFAULT 0,
-    is_fixed_width      TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '1 = no slitting (1000X)',
-    land_cost_base      DECIMAL(10,2) NOT NULL COMMENT '1" land cost for this base_sku',
-    markup_multiplier   DECIMAL(6,4)  NOT NULL DEFAULT 2.1900,
+    base_sku            VARCHAR(20)   NOT NULL,
+    sku                 VARCHAR(40)   NOT NULL UNIQUE COMMENT 'e.g. 730D-1, 730D-0.125, 730D-L22.8',
+    width_inches        DECIMAL(8,4)  NOT NULL COMMENT 'Slit width or full log width',
     quantity_on_hand    DECIMAL(10,2) NOT NULL DEFAULT 0,
     reorder_threshold   DECIMAL(10,2) NOT NULL DEFAULT 0,
-    is_active           TINYINT(1)  NOT NULL DEFAULT 1,
+    is_active           TINYINT(1)    NOT NULL DEFAULT 1,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_base_width (base_sku, width_inches),
-    FOREIGN KEY (category_id) REFERENCES categories(id)
+    FOREIGN KEY (base_sku) REFERENCES products(base_sku)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Seed: 730D — Glass Cloth Tape 2-Layer w/Liner (Heavy) | TW | 18 yds | $19.42 base | ×2.20
--- Widths from inventory PDF; only rows with NEW OH > 0 get stocked, rest pre-defined
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('730D','730D-0.125','Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.125,0,19.42,2.2000,34),
-('730D','730D-0.25', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.250,0,19.42,2.2000,30),
-('730D','730D-0.375','Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.375,0,19.42,2.2000,0),
-('730D','730D-0.5',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.500,0,19.42,2.2000,7),
-('730D','730D-0.75', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,0.750,0,19.42,2.2000,59),
-('730D','730D-1',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.000,0,19.42,2.2000,139),
-('730D','730D-1.25', 'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.250,0,19.42,2.2000,0),
-('730D','730D-1.5',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,1.500,0,19.42,2.2000,0),
-('730D','730D-2',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,2.000,0,19.42,2.2000,125),
-('730D','730D-3',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,3.000,0,19.42,2.2000,0),
-('730D','730D-4',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,4.000,0,19.42,2.2000,0),
-('730D','730D-5',   'Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,5.000,0,19.42,2.2000,0),
-('730D','730D-L22.8','Glass Cloth Tape - 2 Layer w/Liner (Heavy)',3,'TW','P730W-5-2L',0.60,18,22.830,1,19.42,2.2000,0);
+-- Seed: products
+INSERT INTO products (base_sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, is_log, is_fixed_width, land_cost_base, markup_multiplier) VALUES
+('730D',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)', 3,'TW','P730W-5-2L',0.600,18,0,0,19.4200,2.2000),
+('730L',  'Glass Cloth Tape w/Liner',                  2,'TW','P700V-1',    0.190,36,0,0,14.0300,2.1100),
+('730S',  'Glass Cloth Tape w/Liner (Heavy)',           2,'TW','P730W-5',    0.300,36,0,0,15.8900,2.1900),
+('730SL', 'Glass Cloth Tape - 2 Layer w/Liner',        3,'TW','P730M-2',    0.490,18,0,0,17.3300,2.2200),
+('520N',  'Glass Cloth Tape - No Liner',                1,'CN','XBQ-3120',   0.200,36,0,0, 9.9800,2.1900),
+('526N',  'Glass Cloth Tape - No Liner (Heavy)',        1,'CN','XBQ-3123',   0.260,36,0,0,11.8600,2.1900),
+('962S',  'Aluminum/Glass Cloth Tape - No Liner',       4,'CN','XBQ-028',    0.280,36,0,0,11.8500,2.1900),
+('1000X', 'Silicone Rubber Blasting Tape',              5,'CN','XBQ-GT100',  1.250,10,0,1,23.7500,2.1800);
 
--- Seed: 730L — Glass Cloth Tape w/Liner | TW | 36 yds | $14.03 base | ×2.11
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('730L','730L-1',  'Glass Cloth Tape w/Liner',2,'TW','P700V-1',0.19,36,1.000,0,14.03,2.1100,341),
-('730L','730L-2',  'Glass Cloth Tape w/Liner',2,'TW','P700V-1',0.19,36,2.000,0,14.03,2.1100,160),
-('730L','730L-3',  'Glass Cloth Tape w/Liner',2,'TW','P700V-1',0.19,36,3.000,0,14.03,2.1100,0),
-('730L','730L-4',  'Glass Cloth Tape w/Liner',2,'TW','P700V-1',0.19,36,4.000,0,14.03,2.1100,9),
-('730L','730L-5',  'Glass Cloth Tape w/Liner',2,'TW','P700V-1',0.19,36,5.000,0,14.03,2.1100,0),
-('730L','730L-6',  'Glass Cloth Tape w/Liner',2,'TW','P700V-1',0.19,36,6.000,0,14.03,2.1100,66),
-('730L','730L-L48','Glass Cloth Tape w/Liner',2,'TW','P700V-1',0.19,36,48.030,1,14.03,2.1100,11);
+-- Seed: 730D widths
+INSERT INTO items (base_sku, sku, width_inches, quantity_on_hand) VALUES
+('730D','730D-0.125', 0.1250,34),
+('730D','730D-0.25',  0.2500,30),
+('730D','730D-0.375', 0.3750, 0),
+('730D','730D-0.5',   0.5000, 7),
+('730D','730D-0.75',  0.7500,59),
+('730D','730D-1',     1.0000,139),
+('730D','730D-1.25',  1.2500, 0),
+('730D','730D-1.5',   1.5000, 0),
+('730D','730D-2',     2.0000,125),
+('730D','730D-3',     3.0000, 0),
+('730D','730D-4',     4.0000, 0),
+('730D','730D-5',     5.0000, 0),
+('730D','730D-L22.8',22.8300, 0);
 
--- Seed: 730S — Glass Cloth Tape w/Liner (Heavy) | TW | 36 yds | $15.89 base | ×2.19
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('730S','730S-0.125','Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.125,0,15.89,2.1900,160),
-('730S','730S-0.25', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.250,0,15.89,2.1900,92),
-('730S','730S-0.375','Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.375,0,15.89,2.1900,0),
-('730S','730S-0.5',  'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.500,0,15.89,2.1900,6),
-('730S','730S-0.75', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,0.750,0,15.89,2.1900,0),
-('730S','730S-1',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.000,0,15.89,2.1900,75),
-('730S','730S-1.25', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.250,0,15.89,2.1900,18),
-('730S','730S-1.5',  'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,1.500,0,15.89,2.1900,28),
-('730S','730S-2',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,2.000,0,15.89,2.1900,66),
-('730S','730S-3',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,3.000,0,15.89,2.1900,12),
-('730S','730S-4',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,4.000,0,15.89,2.1900,28),
-('730S','730S-5',   'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,5.000,0,15.89,2.1900,0),
-('730S','730S-L48', 'Glass Cloth Tape w/Liner (Heavy)',2,'TW','P730W-5',0.30,36,48.030,1,15.89,2.1900,9);
+-- Seed: 730L widths
+INSERT INTO items (base_sku, sku, width_inches, quantity_on_hand) VALUES
+('730L','730L-1',   1.0000,341),
+('730L','730L-2',   2.0000,160),
+('730L','730L-3',   3.0000,  0),
+('730L','730L-4',   4.0000,  9),
+('730L','730L-5',   5.0000,  0),
+('730L','730L-6',   6.0000, 66),
+('730L','730L-L48',48.0300, 11);
 
--- Seed: 730SL — Glass Cloth Tape 2-Layer w/Liner | TW | 18 yds | $17.33 base | ×2.22
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('730SL','730SL-1',   'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,1.000,0,17.33,2.2200,128),
-('730SL','730SL-1.5',  'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,1.500,0,17.33,2.2200,56),
-('730SL','730SL-2',   'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,2.000,0,17.33,2.2200,80),
-('730SL','730SL-5',   'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,5.000,0,17.33,2.2200,100),
-('730SL','730SL-L42', 'Glass Cloth Tape - 2 Layer w/Liner',3,'TW','P730M-2',0.49,18,42.000,1,17.33,2.2200,0);
+-- Seed: 730S widths
+INSERT INTO items (base_sku, sku, width_inches, quantity_on_hand) VALUES
+('730S','730S-0.125', 0.1250,160),
+('730S','730S-0.25',  0.2500, 92),
+('730S','730S-0.375', 0.3750,  0),
+('730S','730S-0.5',   0.5000,  6),
+('730S','730S-0.75',  0.7500,  0),
+('730S','730S-1',     1.0000, 75),
+('730S','730S-1.25',  1.2500, 18),
+('730S','730S-1.5',   1.5000, 28),
+('730S','730S-2',     2.0000, 66),
+('730S','730S-3',     3.0000, 12),
+('730S','730S-4',     4.0000, 28),
+('730S','730S-5',     5.0000,  0),
+('730S','730S-L48',  48.0300,  9);
 
--- Seed: 520N — Glass Cloth Tape No Liner | CN | 36 yds | $9.98 base | ×2.19 (template at 1")
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('520N','520N-1','Glass Cloth Tape - No Liner',1,'CN','XBQ-3120',0.20,36,1.000,0,9.98,2.1900,0);
+-- Seed: 730SL widths
+INSERT INTO items (base_sku, sku, width_inches, quantity_on_hand) VALUES
+('730SL','730SL-1',    1.0000,128),
+('730SL','730SL-1.5',  1.5000, 56),
+('730SL','730SL-2',    2.0000, 80),
+('730SL','730SL-5',    5.0000,100),
+('730SL','730SL-L42', 42.0000,  0);
 
--- Seed: 526N — Glass Cloth Tape No Liner Heavy | CN | 36 yds | $11.86 base | ×2.19 (template at 1")
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('526N','526N-1','Glass Cloth Tape - No Liner (Heavy)',1,'CN','XBQ-3123',0.26,36,1.000,0,11.86,2.1900,0);
-
--- Seed: 962S — Aluminum/Glass Cloth Tape No Liner | CN | 36 yds | $11.85 base | ×2.19 (template at 1")
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('962S','962S-1','Aluminum/Glass Cloth Tape - No Liner',4,'CN','XBQ-028',0.28,36,1.000,0,11.85,2.1900,0);
-
--- Seed: 1000X — Silicone Rubber Blasting Tape | CN | 10 yds | fixed 2" | $23.75 | ×2.18
-INSERT INTO items (base_sku, sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, width_inches, is_log, is_fixed_width, land_cost_base, markup_multiplier, quantity_on_hand) VALUES
-('1000X','1000X-2','Silicone Rubber Blasting Tape',5,'CN','XBQ-GT100',1.25,10,2.000,0,1,23.75,2.1800,0);
+-- Seed: 520N, 526N, 962S, 1000X template widths
+INSERT INTO items (base_sku, sku, width_inches, quantity_on_hand) VALUES
+('520N', '520N-1',   1.0000,0),
+('526N', '526N-1',   1.0000,0),
+('962S', '962S-1',   1.0000,0),
+('1000X','1000X-2',  2.0000,0);
 
 -- --------------------------------------------------------
 -- Width Multipliers (pricing breakpoints; interpolated for intermediate widths)
