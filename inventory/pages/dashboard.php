@@ -102,14 +102,11 @@ render_header('Dashboard', 'dashboard');
                 <td>#<?= (int)$q['quote_number'] ?></td>
                 <td><?= h($q['customer_name']) ?><?php if ($q['company']): ?><br><small class="text-muted"><?= h($q['company']) ?></small><?php endif; ?></td>
                 <td>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>">
-                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()" style="width:auto">
-                            <?php foreach (['draft'=>'Draft','sent'=>'Sent','ordered'=>'Ordered'] as $val => $label): ?>
-                            <option value="<?= $val ?>" <?= $q['status'] === $val ? 'selected' : '' ?>><?= $label ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </form>
+                    <select class="form-select form-select-sm" style="width:auto" onchange="setStatus(<?= (int)$q['id'] ?>, this.value)">
+                        <?php foreach (['draft'=>'Draft','sent'=>'Sent','ordered'=>'Ordered'] as $val => $label): ?>
+                        <option value="<?= $val ?>" <?= $q['status'] === $val ? 'selected' : '' ?>><?= $label ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </td>
                 <td><?= date('M j, Y', strtotime($q['created_at'])) ?></td>
                 <td><a href="/inventory/pages/quote-edit.php?id=<?= (int)$q['id'] ?>" class="btn btn-sm btn-outline-secondary">View</a></td>
@@ -121,4 +118,15 @@ render_header('Dashboard', 'dashboard');
     </div>
 </div>
 
+<form method="post" id="statusForm" action="/inventory/pages/dashboard.php">
+    <input type="hidden" name="quote_id" id="statusQuoteId">
+    <input type="hidden" name="status"   id="statusValue">
+</form>
+<script>
+function setStatus(quoteId, status) {
+    document.getElementById('statusQuoteId').value = quoteId;
+    document.getElementById('statusValue').value   = status;
+    document.getElementById('statusForm').submit();
+}
+</script>
 <?php render_footer(); ?>
