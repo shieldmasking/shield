@@ -181,7 +181,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
 
     <?php if ($quote['notes']): ?>
     <div class="notes-block">
-        <div class="notes-label">Notes</div>
+        <div class="notes-label">Terms</div>
         <?= nl2br(h($quote['notes'])) ?>
     </div>
     <?php endif; ?>
