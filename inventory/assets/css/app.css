@@ -1,0 +1,50 @@
+body {
+    background-color: #f4f6f9;
+    font-size: 0.9rem;
+}
+
+.navbar-brand {
+    letter-spacing: 0.03em;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+}
+
+.badge-draft     { background-color: #6c757d; }
+.badge-sent      { background-color: #0d6efd; }
+.badge-approved  { background-color: #198754; }
+.badge-expired   { background-color: #fd7e14; }
+.badge-rejected  { background-color: #dc3545; }
+
+.low-stock {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.stat-card .card-body {
+    padding: 1.5rem;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.stat-card .stat-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}

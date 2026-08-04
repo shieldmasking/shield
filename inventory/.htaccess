@@ -1,0 +1,30 @@
+# Force HTTPS
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Custom 404
+ErrorDocument 404 /inventory/404.php
+
+# Security headers
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set X-Content-Type-Options "nosniff"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set X-XSS-Protection "1; mode=block"
+
+# Block direct web access to sensitive paths
+<FilesMatch "\.(env|log|sh|sql|md|example)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteRule ^inc/ - [F,L]
+    RewriteRule ^sql/ - [F,L]
+    RewriteRule ^uploads/.*\.php$ - [F,L]
+</IfModule>
+
+# PHP settings
+php_flag display_errors Off
+php_value upload_max_filesize 10M
+php_value post_max_size 10M

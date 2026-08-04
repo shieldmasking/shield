@@ -1,0 +1,22 @@
+<?php
+// Copy this file to config.php and fill in your values
+// config.php is gitignored — NEVER commit it
+
+$db_host = 'localhost';
+$db_name = 'USERNAME_shield';
+$db_user = 'USERNAME_shielduser';
+$db_pass = 'YOUR_PASSWORD_HERE';
+
+$app_url  = 'https://shieldmasking.com/inventory';
+$app_name = 'Shield Masking';
+
+// Email (for low-stock alerts)
+$mail_from    = 'noreply@shieldmasking.com';
+$mail_to      = 'admin@shieldmasking.com';
+
+// QuickBooks Online — stub, fill in when credentials are available
+$qb_client_id     = '';
+$qb_client_secret = '';
+$qb_realm_id      = '';
+$qb_access_token  = '';
+$qb_refresh_token = '';
