@@ -187,7 +187,7 @@ tbody tr:nth-child(even) td { background: #f9f9f9; }
     <?php endif; ?>
 
     <div class="notes-block" style="margin-top:12px">
-        <div class="notes-label">Shipping &amp; Terms</div>
+        <div class="notes-label">Shipping</div>
         FOB Origin. Shipping included on orders over $5,000 (Continental US only).
     </div>
 
