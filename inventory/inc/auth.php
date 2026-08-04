@@ -4,10 +4,15 @@ function require_login(): void {
         header('Location: /inventory/index.php');
         exit;
     }
+    if (!empty($_SESSION['force_password_change']) &&
+        !str_ends_with($_SERVER['SCRIPT_NAME'], 'change-password.php')) {
+        header('Location: /inventory/pages/change-password.php');
+        exit;
+    }
 }
 
 function attempt_login(PDO $db, string $email, string $password): string {
-    $stmt = $db->prepare('SELECT id, password_hash, failed_attempts, locked_until FROM users WHERE email = ?');
+    $stmt = $db->prepare('SELECT id, password_hash, failed_attempts, locked_until, force_password_change FROM users WHERE email = ?');
     $stmt->execute([strtolower(trim($email))]);
     $user = $stmt->fetch();
 
@@ -34,7 +39,8 @@ function attempt_login(PDO $db, string $email, string $password): string {
        ->execute([$user['id']]);
 
     session_regenerate_id(true);
-    $_SESSION['user_id'] = $user['id'];
+    $_SESSION['user_id']              = $user['id'];
+    $_SESSION['force_password_change'] = (bool)$user['force_password_change'];
     return '';
 }
 

@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = 'Invalid email.';
         } else {
             try {
-                $db->prepare('INSERT INTO users (name, email, phone, password_hash) VALUES (?,?,?,?)')
+                $db->prepare('INSERT INTO users (name, email, phone, password_hash, force_password_change) VALUES (?,?,?,?,1)')
                    ->execute([$name, $email, $phone ?: null, password_hash($pass, PASSWORD_DEFAULT)]);
                 $msg = "User {$name} added.";
             } catch (PDOException $e) {
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (strlen($pass) < 10) {
             $msg = 'Password must be at least 10 characters.';
         } else {
-            $db->prepare('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE id=?')
+            $db->prepare('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL, force_password_change=1 WHERE id=?')
                ->execute([password_hash($pass, PASSWORD_DEFAULT), $user_id]);
             $msg = 'Password reset.';
         }

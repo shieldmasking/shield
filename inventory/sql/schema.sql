@@ -25,9 +25,10 @@ CREATE TABLE users (
     email           VARCHAR(150) NOT NULL UNIQUE,
     phone           VARCHAR(30) NULL,
     password_hash   VARCHAR(255) NOT NULL,
-    failed_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    locked_until    DATETIME NULL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    failed_attempts       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    locked_until          DATETIME NULL,
+    force_password_change TINYINT(1) NOT NULL DEFAULT 0,
+    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
