@@ -150,6 +150,103 @@ function get_last_quote_prices(PDO $db, int $customer_id): array {
     return $prices;
 }
 
+// ── PDF PO Parsing ────────────────────────────────────────────────────────────
+
+/**
+ * Extract line items from a PO PDF.
+ * Matches known SKUs in the text; extracts qty and unit price from the same line.
+ * Returns ['parse_error' => bool, 'items' => [['sku','item_id','qty','price'], ...]].
+ */
+function parse_po_pdf(string $file_path, PDO $db): array {
+    $autoload = __DIR__ . '/../vendor/autoload.php';
+    if (!file_exists($autoload)) {
+        return ['parse_error' => true, 'items' => []];
+    }
+    require_once $autoload;
+
+    try {
+        $parser = new \Smalot\PdfParser\Parser();
+        $text   = $parser->parseFile($file_path)->getText();
+    } catch (\Throwable $e) {
+        return ['parse_error' => true, 'items' => []];
+    }
+
+    if (empty(trim($text))) {
+        return ['parse_error' => true, 'items' => []];
+    }
+
+    // Longest SKUs first to avoid partial matches (e.g. '730D-1.5' before '730D-1')
+    $rows = $db->query(
+        'SELECT sku, id FROM items WHERE is_active = 1 ORDER BY LENGTH(sku) DESC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $sku_map = [];
+    foreach ($rows as $r) $sku_map[$r['sku']] = (int)$r['id'];
+
+    $found = [];
+    foreach (preg_split('/\r?\n/', $text) as $line) {
+        $line = trim($line);
+        if (!$line) continue;
+        foreach (array_keys($sku_map) as $sku) {
+            if (isset($found[$sku])) continue;
+            if (!preg_match('/\b' . preg_quote($sku, '/') . '\b/i', $line)) continue;
+
+            // Remove SKU so its digits aren't confused with qty/price
+            $stripped = preg_replace('/\b' . preg_quote($sku, '/') . '\b/i', '', $line);
+
+            preg_match_all('/\$?\s*(\d{1,6}\.\d{2})\b/', $stripped, $pm);
+            preg_match_all('/\b(\d{1,4})\b/', $stripped, $qm);
+
+            $price    = isset($pm[1][0]) ? (float)$pm[1][0] : null;
+            $integers = array_values(array_filter($qm[1] ?? [], fn($n) => (int)$n > 0 && (int)$n < 9999));
+            $qty      = !empty($integers) ? (int)$integers[0] : null;
+
+            $found[$sku] = ['sku' => $sku, 'item_id' => $sku_map[$sku], 'qty' => $qty, 'price' => $price];
+        }
+    }
+
+    if (empty($found)) {
+        return ['parse_error' => true, 'items' => []];
+    }
+
+    return ['parse_error' => false, 'items' => array_values($found)];
+}
+
+/**
+ * Compare PO items against quote items; return array of discrepancies.
+ */
+function compare_po_to_quote(array $po_items, array $quote_items): array {
+    $discrepancies = [];
+    $po_by_sku     = array_column($po_items, null, 'sku');
+
+    foreach ($quote_items as $qi) {
+        $sku = $qi['sku'];
+        $po  = $po_by_sku[$sku] ?? null;
+        if (!$po) {
+            $discrepancies[] = ['sku' => $sku, 'missing_from_po' => true,
+                                'qty_quote' => (int)$qi['quantity'], 'price_quote' => (float)$qi['unit_price']];
+            continue;
+        }
+        $d = ['sku' => $sku]; $has = false;
+        if ($po['qty'] !== null && (int)$po['qty'] !== (int)$qi['quantity']) {
+            $d['qty_quote'] = (int)$qi['quantity']; $d['qty_po'] = (int)$po['qty']; $has = true;
+        }
+        if ($po['price'] !== null && abs((float)$po['price'] - (float)$qi['unit_price']) > 0.01) {
+            $d['price_quote'] = (float)$qi['unit_price']; $d['price_po'] = (float)$po['price']; $has = true;
+        }
+        if ($has) $discrepancies[] = $d;
+    }
+
+    $quote_skus = array_column($quote_items, 'sku');
+    foreach ($po_items as $pi) {
+        if (!in_array($pi['sku'], $quote_skus)) {
+            $discrepancies[] = ['sku' => $pi['sku'], 'missing_from_quote' => true,
+                                'qty_po' => $pi['qty'], 'price_po' => $pi['price']];
+        }
+    }
+
+    return $discrepancies;
+}
+
 // ── Inventory ─────────────────────────────────────────────────────────────────
 
 /**

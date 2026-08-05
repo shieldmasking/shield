@@ -1,0 +1,8 @@
+{
+    "require": {
+        "smalot/pdfparser": "^2.0"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

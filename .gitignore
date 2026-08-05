@@ -1,4 +1,5 @@
 inventory/config.php
+inventory/vendor/
 inventory/uploads/
 inventory/*.xlsx
 inventory/*.pdf

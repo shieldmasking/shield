@@ -205,7 +205,8 @@ $standard_widths = standard_widths(); // 0.125 to 6.0 in 0.125" steps
 $total = array_sum(array_map(fn($r) => $r['quantity'] * $r['unit_price'], $quote_items));
 
 $page_title   = $quote_id ? "Quote #" . $quote['quote_number'] : "New Quote";
-$status_badge = ['draft'=>'secondary','sent'=>'primary','ordered'=>'success'];
+$status_badge  = ['draft'=>'secondary','sent'=>'primary','ordered'=>'success'];
+$status_labels = ['draft'=>'Draft','sent'=>'Sent','ordered'=>'PO Received'];
 
 render_header($page_title, 'quotes');
 ?>
@@ -215,7 +216,7 @@ render_header($page_title, 'quotes');
         <h4 class="mb-0"><?= h($page_title) ?></h4>
         <?php if ($quote): ?>
         <small class="text-muted"><?= h($quote['customer_name']) ?> &mdash;
-            <span class="badge bg-<?= $status_badge[$quote['status']] ?>"><?= ucfirst($quote['status']) ?></span>
+            <span class="badge bg-<?= $status_badge[$quote['status']] ?>"><?= $status_labels[$quote['status']] ?? ucfirst($quote['status']) ?></span>
         </small>
         <?php endif; ?>
     </div>
@@ -245,7 +246,7 @@ render_header($page_title, 'quotes');
     <div class="col-md-6">
         <div class="card h-100"><div class="card-header fw-semibold">Details</div>
         <div class="card-body">
-            <div>Status: <span class="badge bg-<?= $status_badge[$quote['status']] ?>"><?= ucfirst($quote['status']) ?></span></div>
+            <div>Status: <span class="badge bg-<?= $status_badge[$quote['status']] ?>"><?= $status_labels[$quote['status']] ?? ucfirst($quote['status']) ?></span></div>
             <div class="mt-1">Date: <?= date('M j, Y', strtotime($quote['created_at'])) ?></div>
             <?php if ($quote['po_pdf_path']): ?>
             <div class="mt-1"><a href="/inventory/<?= h($quote['po_pdf_path']) ?>" target="_blank">View Customer PO</a></div>

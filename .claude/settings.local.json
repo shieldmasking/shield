@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"Restore setup.php for post-schema-reset user creation:*)",
+      "Bash(git commit:*)",
+      "Bash(python3 -c \":*)",
+      "Bash(find C:UsersrstreProjectsshieldinventory -type f -name *.php -o -name *.sql)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/Users/rstre/Projects/shield/inventory -type f \\\\\\(-name README* -o -name *.md -o -name NOTES* \\\\\\))",
+      "Bash(find C:UsersrstreProjectsshield -name *.json -type f)",
+      "Bash(composer install:*)",
+      "Bash(where composer:*)",
+      "Bash(php -r \"echo PHP_OS_FAMILY;\")",
+      "Bash(cmd.exe /c \"where composer\")",
+      "Bash(cmd.exe /c \"composer --version\")",
+      "Bash(cmd.exe /c \"where composer.bat 2>nul & where composer.phar 2>nul & php --version 2>nul\" 2>&1)"
+    ]
+  }
+}
