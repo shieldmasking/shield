@@ -145,7 +145,7 @@ render_header('Admin — Products', 'admin');
 <div class="card-body p-0">
 <table class="table table-sm mb-0 align-middle">
 <thead class="table-light"><tr>
-    <th>SKU</th><th>Width</th><th>Length</th><th>Sell Price</th><th>On Hand</th><th>Reorder At</th><th>Active</th><th></th>
+    <th>SKU</th><th>Width</th><th>Length</th><th>Sell Price</th><th>Discount Price</th><th>On Hand</th><th>Reorder At</th><th>Active</th><th></th>
 </tr></thead>
 <tbody>
 <?php foreach ($rows as $item):
@@ -156,12 +156,18 @@ render_header('Admin — Products', 'admin');
         : ($prod['is_fixed_width']
             ? currency(round($prod['land_cost_base'] * $prod['markup_multiplier'], 2))
             : currency(calculate_sell_price($merged, $wm)));
+    $disc = $prod['is_log']
+        ? currency(round($prod['land_cost_base'] * $item['width_inches'] * 1.9, 2))
+        : ($prod['is_fixed_width']
+            ? currency(round($prod['land_cost_base'] * 1.9, 2))
+            : currency(round(calculate_sell_price($merged, $wm) / $prod['markup_multiplier'] * 1.9, 2)));
 ?>
 <tr class="<?= !$item['is_active'] ? 'table-secondary text-muted' : '' ?>">
     <td class="fw-semibold"><?= h($item['sku']) ?></td>
     <td><?= width_label($merged) ?></td>
     <td><?= (int)$prod['roll_length_yards'] ?>yds</td>
     <td><?= $sell ?></td>
+    <td><?= $disc ?></td>
     <td><?= (int)$item['quantity_on_hand'] ?></td>
     <td><?= $item['reorder_threshold'] > 0 ? (int)$item['reorder_threshold'] : '—' ?></td>
     <td><?= $item['is_active'] ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
