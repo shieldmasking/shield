@@ -246,6 +246,6 @@ function format_width(float $w): string {
  */
 function width_label(array $item): string {
     if ($item['is_fixed_width']) return '2" (fixed)';
-    if ($item['is_log'])        return 'Log ' . format_width((float)$item['width_inches']);
+    if ($item['is_log'])        return format_width((float)$item['width_inches']);
     return format_width((float)$item['width_inches']);
 }
