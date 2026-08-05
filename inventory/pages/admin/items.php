@@ -145,7 +145,7 @@ render_header('Admin — Products', 'admin');
 <div class="card-body p-0">
 <table class="table table-sm mb-0 align-middle">
 <thead class="table-light"><tr>
-    <th>SKU</th><th>Width</th><th>Length</th><th>Sell Price</th><th>Discount Price</th><th>On Hand</th><th>Reorder At</th><th>Active</th><th></th>
+    <th>SKU</th><th>Width</th><th>Length</th><th>Roll Price</th><th>Case Price</th><th>On Hand</th><th>Reorder At</th><th>Active</th><th></th>
 </tr></thead>
 <tbody>
 <?php foreach ($rows as $item):
