@@ -47,8 +47,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Change status only
     if ($action === 'status') {
         $new = $_POST['new_status'] ?? '';
-        if ($quote_id && in_array($new, ['sent'])) {
+        if ($quote_id && in_array($new, ['draft', 'sent'])) {
+            $cur = $db->prepare('SELECT status FROM quotes WHERE id = ?');
+            $cur->execute([$quote_id]);
+            $current_status = $cur->fetchColumn();
+
             $db->prepare('UPDATE quotes SET status=? WHERE id=?')->execute([$new, $quote_id]);
+
+            if ($current_status === 'ordered') {
+                $ord = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
+                $ord->execute([$quote_id]);
+                $order = $ord->fetch();
+                if ($order) {
+                    $order_id = (int)$order['id'];
+                    $items = $db->prepare('SELECT item_id, quantity FROM order_items WHERE order_id = ?');
+                    $items->execute([$order_id]);
+                    foreach ($items->fetchAll() as $oi) {
+                        adjust_inventory($db, (int)$oi['item_id'], (float)$oi['quantity'],
+                            'Order cancelled — Quote reverted to ' . $new, 'adjustment', null, current_user_id());
+                    }
+                    $db->prepare('DELETE FROM orders WHERE id = ?')->execute([$order_id]);
+                }
+            }
         }
         header("Location: /inventory/pages/quote-edit.php?id={$quote_id}&msg=Status+updated");
         exit;
@@ -261,6 +281,16 @@ render_header($page_title, 'quotes');
 <?php if ($quote['notes']): ?>
 <div class="card"><div class="card-header fw-semibold">Notes</div>
 <div class="card-body"><?= nl2br(h($quote['notes'])) ?></div></div>
+<?php endif; ?>
+
+<?php if ($quote['status'] === 'ordered'): ?>
+<form method="post" class="mt-3">
+    <input type="hidden" name="action" value="status">
+    <button type="submit" name="new_status" value="draft" class="btn btn-outline-danger btn-sm"
+        onclick="return confirm('Revert to draft? This will reverse the inventory deduction and delete the order.')">
+        Revert to Draft
+    </button>
+</form>
 <?php endif; ?>
 
 <?php else: // Editable form ?>
