@@ -64,14 +64,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_id'], $_POST['s
     $new      = $_POST['status'];
     $quote_id = (int)$_POST['quote_id'];
     if (in_array($new, ['draft', 'sent', 'ordered'])) {
+        // Check current status before updating
+        $cur = $db->prepare('SELECT status FROM quotes WHERE id = ?');
+        $cur->execute([$quote_id]);
+        $current_status = $cur->fetchColumn();
+
         $db->prepare('UPDATE quotes SET status=? WHERE id=?')->execute([$new, $quote_id]);
-        if ($new === 'ordered') {
+
+        if ($new === 'ordered' && $current_status !== 'ordered') {
             $existing = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
             $existing->execute([$quote_id]);
             if (!$existing->fetch()) {
                 $notices = log_cut_recommendations($db, $quote_id);
                 if ($notices) $_SESSION['cut_notices'] = $notices;
                 create_order_from_quote($db, $quote_id, $_SESSION['user_id']);
+            }
+        } elseif ($current_status === 'ordered' && $new !== 'ordered') {
+            // Reverse inventory and delete the order
+            $ord = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
+            $ord->execute([$quote_id]);
+            $order = $ord->fetch();
+            if ($order) {
+                $order_id = (int)$order['id'];
+                $items = $db->prepare('SELECT item_id, quantity FROM order_items WHERE order_id = ?');
+                $items->execute([$order_id]);
+                foreach ($items->fetchAll() as $oi) {
+                    adjust_inventory($db, (int)$oi['item_id'], (float)$oi['quantity'],
+                        'Order cancelled — Quote reverted to ' . $new, 'adjustment', null, $_SESSION['user_id']);
+                }
+                $db->prepare('DELETE FROM orders WHERE id = ?')->execute([$order_id]);
             }
         }
     }
