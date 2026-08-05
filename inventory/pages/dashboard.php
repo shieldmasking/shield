@@ -69,6 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_id'], $_POST['s
             $existing = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
             $existing->execute([$quote_id]);
             if (!$existing->fetch()) {
+                $notices = log_cut_recommendations($db, $quote_id);
+                if ($notices) $_SESSION['cut_notices'] = $notices;
                 create_order_from_quote($db, $quote_id, $_SESSION['user_id']);
             }
         }
@@ -129,6 +131,25 @@ render_header('Dashboard', 'dashboard');
 <?php foreach ($po_errors as $e): ?>
 <div class="alert alert-danger"><?= h($e) ?></div>
 <?php endforeach; ?>
+<?php endif; ?>
+<?php if (!empty($_SESSION['cut_notices'])): ?>
+<?php $cut_notices = $_SESSION['cut_notices']; unset($_SESSION['cut_notices']); ?>
+<div class="alert alert-warning">
+    <strong>Log cutting required to fulfil order:</strong>
+    <ul class="mb-0 mt-1">
+    <?php foreach ($cut_notices as $n): ?>
+        <li>
+            Cut <strong><?= $n['logs_needed'] ?></strong> log<?= $n['logs_needed'] > 1 ? 's' : '' ?> of
+            <strong><?= h($n['log_sku']) ?></strong> (<?= format_width($n['log_width']) ?>) →
+            <?= $n['rolls_per_log'] ?> rolls/log of <?= format_width($n['cut_width']) ?>
+            for <strong><?= h($n['sku']) ?></strong>
+            <?php if (!$n['enough']): ?>
+            <span class="text-danger fw-semibold">(only <?= $n['logs_available'] ?> available)</span>
+            <?php endif; ?>
+        </li>
+    <?php endforeach; ?>
+    </ul>
+</div>
 <?php endif; ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">

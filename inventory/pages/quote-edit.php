@@ -92,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                ->execute([$po_path, $quote_id]);
 
             try {
+                $notices = log_cut_recommendations($db, $quote_id);
+                if ($notices) $_SESSION['cut_notices'] = $notices;
                 $order_id = create_order_from_quote($db, $quote_id, current_user_id());
                 header("Location: /inventory/pages/order-view.php?id={$order_id}&msg=Order+created");
                 exit;

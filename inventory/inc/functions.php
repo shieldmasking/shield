@@ -152,6 +152,59 @@ function get_last_quote_prices(PDO $db, int $customer_id): array {
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
 
+/**
+ * For each line item in a quote where quantity > on-hand, find the log item
+ * for the same base_sku and calculate how many full logs to cut.
+ * Logs needed covers the order deficit + reorder threshold replenishment.
+ * Returns an array of recommendation arrays (empty if nothing needed).
+ */
+function log_cut_recommendations(PDO $db, int $quote_id): array {
+    $stmt = $db->prepare('
+        SELECT qi.quantity, i.id AS item_id, i.sku, i.width_inches,
+               i.quantity_on_hand, i.reorder_threshold, i.base_sku
+        FROM quote_items qi
+        JOIN items i ON i.id = qi.item_id
+        WHERE qi.quote_id = ?
+    ');
+    $stmt->execute([$quote_id]);
+    $line_items = $stmt->fetchAll();
+
+    $notices = [];
+    foreach ($line_items as $li) {
+        $qty_after = (float)$li['quantity_on_hand'] - (int)$li['quantity'];
+        $target    = max(0, (float)$li['reorder_threshold']);
+        $needed    = $target - $qty_after; // rolls needed from logs
+        if ($needed <= 0) continue;
+
+        $log_stmt = $db->prepare("
+            SELECT id, sku, width_inches, quantity_on_hand
+            FROM items
+            WHERE base_sku = ? AND sku LIKE CONCAT(base_sku, '-L%')
+            LIMIT 1
+        ");
+        $log_stmt->execute([$li['base_sku']]);
+        $log = $log_stmt->fetch();
+        if (!$log || $log['width_inches'] <= 0) continue;
+
+        $rolls_per_log = (int)floor((float)$log['width_inches'] / (float)$li['width_inches']);
+        if ($rolls_per_log < 1) continue;
+
+        $logs_needed = (int)ceil($needed / $rolls_per_log);
+
+        $notices[] = [
+            'sku'            => $li['sku'],
+            'cut_width'      => (float)$li['width_inches'],
+            'log_sku'        => $log['sku'],
+            'log_width'      => (float)$log['width_inches'],
+            'rolls_per_log'  => $rolls_per_log,
+            'logs_needed'    => $logs_needed,
+            'logs_available' => (int)$log['quantity_on_hand'],
+            'enough'         => (int)$log['quantity_on_hand'] >= $logs_needed,
+        ];
+    }
+    return $notices;
+}
+
 function adjust_inventory(PDO $db, int $item_id, float $change_qty, string $reason, string $ref_type, ?int $ref_id, int $user_id): void {
     $db->prepare('UPDATE items SET quantity_on_hand = quantity_on_hand + ? WHERE id = ?')
        ->execute([$change_qty, $item_id]);

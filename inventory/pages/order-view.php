@@ -40,6 +40,25 @@ $total = array_sum(array_map(fn($r) => $r['quantity'] * $r['unit_price'], $line_
 
 render_header("Order #{$order_id}", 'orders');
 ?>
+<?php if (!empty($_SESSION['cut_notices'])): ?>
+<?php $cut_notices = $_SESSION['cut_notices']; unset($_SESSION['cut_notices']); ?>
+<div class="alert alert-warning">
+    <strong>Log cutting required to fulfil order:</strong>
+    <ul class="mb-0 mt-1">
+    <?php foreach ($cut_notices as $n): ?>
+        <li>
+            Cut <strong><?= $n['logs_needed'] ?></strong> log<?= $n['logs_needed'] > 1 ? 's' : '' ?> of
+            <strong><?= h($n['log_sku']) ?></strong> (<?= format_width($n['log_width']) ?>) →
+            <?= $n['rolls_per_log'] ?> rolls/log of <?= format_width($n['cut_width']) ?>
+            for <strong><?= h($n['sku']) ?></strong>
+            <?php if (!$n['enough']): ?>
+            <span class="text-danger fw-semibold">(only <?= $n['logs_available'] ?> available)</span>
+            <?php endif; ?>
+        </li>
+    <?php endforeach; ?>
+    </ul>
+</div>
+<?php endif; ?>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
