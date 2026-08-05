@@ -61,9 +61,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_from_po'])) {
 
 // ── Status change ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_id'], $_POST['status'])) {
-    $new = $_POST['status'];
+    $new      = $_POST['status'];
+    $quote_id = (int)$_POST['quote_id'];
     if (in_array($new, ['draft', 'sent', 'ordered'])) {
-        $db->prepare('UPDATE quotes SET status=? WHERE id=?')->execute([$new, (int)$_POST['quote_id']]);
+        $db->prepare('UPDATE quotes SET status=? WHERE id=?')->execute([$new, $quote_id]);
+        if ($new === 'ordered') {
+            $existing = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
+            $existing->execute([$quote_id]);
+            if (!$existing->fetch()) {
+                create_order_from_quote($db, $quote_id, $_SESSION['user_id']);
+            }
+        }
     }
     header('Location: /inventory/pages/dashboard.php?' . http_build_query(array_filter([
         'status' => $_POST['_filter_status'] ?? '',
