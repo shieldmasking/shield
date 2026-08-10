@@ -145,17 +145,19 @@ render_header('Admin — Products', 'admin');
 <div class="card-body p-0">
 <table class="table table-sm mb-0 align-middle">
 <thead class="table-light"><tr>
-    <th>SKU</th><th>Width</th><th>Length</th><th>Roll Price</th><th>Case Price</th><th>On Hand</th><th>Reorder At</th><th>Active</th><th></th>
+    <th>SKU</th><th>Width</th><th>Length</th><th>Roll Price</th><th>Case Price</th><th>Volume Price</th><th>On Hand</th><th>Reorder At</th><th>Active</th><th></th>
 </tr></thead>
 <tbody>
 <?php foreach ($rows as $item):
     // Merge product fields for pricing calculation
     $merged = array_merge($prod, $item);
-    $sell = $prod['is_log']
-        ? currency(round($prod['land_cost_base'] * $item['width_inches'] * $prod['markup_multiplier'], 2))
+    $sell_raw = $prod['is_log']
+        ? round($prod['land_cost_base'] * $item['width_inches'] * $prod['markup_multiplier'], 2)
         : ($prod['is_fixed_width']
-            ? currency(round($prod['land_cost_base'] * $prod['markup_multiplier'], 2))
-            : currency(calculate_sell_price($merged, $wm)));
+            ? round($prod['land_cost_base'] * $prod['markup_multiplier'], 2)
+            : calculate_sell_price($merged, $wm));
+    $sell = currency($sell_raw);
+    $vol  = currency(round($sell_raw * 0.70, 2));
     $disc = $prod['is_log']
         ? currency(round($prod['land_cost_base'] * $item['width_inches'] * 1.9, 2))
         : ($prod['is_fixed_width']
@@ -168,6 +170,7 @@ render_header('Admin — Products', 'admin');
     <td><?= (int)$prod['roll_length_yards'] ?>yds</td>
     <td><?= $sell ?></td>
     <td><?= $disc ?></td>
+    <td><?= $vol ?></td>
     <td><?= (int)$item['quantity_on_hand'] ?></td>
     <td><?= $item['reorder_threshold'] > 0 ? (int)$item['reorder_threshold'] : '—' ?></td>
     <td><?= $item['is_active'] ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
@@ -184,7 +187,7 @@ render_header('Admin — Products', 'admin');
 </tr>
 <?php endforeach; ?>
 <?php if (empty($rows)): ?>
-<tr><td colspan="8" class="text-muted text-center py-2">No width rows yet.</td></tr>
+<tr><td colspan="9" class="text-muted text-center py-2">No width rows yet.</td></tr>
 <?php endif; ?>
 </tbody>
 </table>
