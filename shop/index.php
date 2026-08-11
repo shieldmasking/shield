@@ -18,12 +18,12 @@ $widths_raw = $db->query("
     SELECT DISTINCT i.width_inches
     FROM items i
     JOIN products p ON p.base_sku = i.base_sku
-    WHERE i.is_active = 1
+    WHERE i.is_active = 1 AND i.quantity_on_hand > 0 AND p.is_log = 0
     ORDER BY i.width_inches ASC
 ")->fetchAll(PDO::FETCH_COLUMN);
 
 // ── Product query ─────────────────────────────────────────────────────────────
-$where  = ['i.is_active = 1'];
+$where  = ['i.is_active = 1', 'i.quantity_on_hand > 0', 'p.is_log = 0'];
 $params = [];
 
 if (!empty($filter_cats)) {
@@ -177,11 +177,7 @@ shop_header('Shop', 'products');
                             <div class="card-body d-flex flex-column">
                                 <div class="d-flex gap-1 mb-2 flex-wrap">
                                     <span class="badge text-bg-secondary"><?= h($p['category_name']) ?></span>
-                                    <?php if ($p['quantity_on_hand'] > 0): ?>
-                                        <span class="badge text-bg-success">In Stock</span>
-                                    <?php else: ?>
-                                        <span class="badge text-bg-danger">Out of Stock</span>
-                                    <?php endif; ?>
+                                    <span class="badge text-bg-success">In Stock</span>
                                 </div>
                                 <div class="fw-bold"><?= h($p['name']) ?></div>
                                 <div class="text-muted small mb-1"><?= h($p['sku']) ?></div>
@@ -202,12 +198,10 @@ shop_header('Shop', 'products');
                                         <input type="number" class="form-control"
                                                id="qty_<?= $p['id'] ?>"
                                                value="1" min="1"
-                                               max="<?= max(1, (int)$p['quantity_on_hand']) ?>"
-                                               <?= $p['quantity_on_hand'] <= 0 ? 'disabled' : '' ?>>
+                                               max="<?= (int)$p['quantity_on_hand'] ?>">
                                         <button class="btn btn-primary"
                                                 onclick="addToCart(<?= (int)$p['id'] ?>, <?= (int)$p['id'] ?>)"
-                                                style="background:#1e2d6b;border-color:#1e2d6b;"
-                                                <?= $p['quantity_on_hand'] <= 0 ? 'disabled' : '' ?>>
+                                                style="background:#1e2d6b;border-color:#1e2d6b;">
                                             Add to Cart
                                         </button>
                                     </div>
