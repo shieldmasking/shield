@@ -1,7 +1,4 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
 // Session first — before any output or requires that might emit whitespace
 if (session_status() === PHP_SESSION_NONE) session_start();
 
