@@ -9,6 +9,38 @@ require_login();
 
 $db = db();
 
+// Handle convert POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_source_item_id'])) {
+    $src_id  = (int)$_POST['convert_source_item_id'];
+    $src_qty = (int)$_POST['convert_source_qty'];
+    $lines   = $_POST['convert_lines'] ?? [];
+
+    if ($src_id && $src_qty > 0 && !empty($lines)) {
+        $src_stmt = $db->prepare('SELECT i.*, p.is_log FROM items i JOIN products p ON p.base_sku = i.base_sku WHERE i.id = ?');
+        $src_stmt->execute([$src_id]);
+        $src_row = $src_stmt->fetch();
+
+        if ($src_row) {
+            $base_sku = $src_row['base_sku'];
+            adjust_inventory($db, $src_id, -$src_qty, "Converted {$src_qty}x {$src_row['sku']} to rolls", 'convert', null, current_user_id());
+
+            foreach ($lines as $line) {
+                $width = (float)($line['width'] ?? 0);
+                $qty   = (int)($line['qty'] ?? 0);
+                if ($width > 0 && $qty > 0) {
+                    $tgt_id = find_or_create_item($db, $base_sku, $width, false);
+                    if ($tgt_id) {
+                        adjust_inventory($db, $tgt_id, $qty, "Converted from {$src_row['sku']}", 'convert', null, current_user_id());
+                    }
+                }
+            }
+        }
+    }
+
+    header('Location: /inventory/pages/inventory.php?saved=1');
+    exit;
+}
+
 // Handle stock adjustment POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['adjust_item_id'])) {
     $item_id  = (int)$_POST['adjust_item_id'];
@@ -96,6 +128,9 @@ render_header('Inventory', 'inventory');
     <div class="d-flex gap-2">
         <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#receiveNewModal">
             + Receive New Width
+        </button>
+        <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#convertModal">
+            Convert
         </button>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#adjustModal">
             Adjust Stock
@@ -265,6 +300,79 @@ render_header('Inventory', 'inventory');
     </div>
 </div>
 
+<!-- Convert Modal -->
+<div class="modal fade" id="convertModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Convert Roll / Log</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: inputs -->
+                <div id="convertStep1">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Source Item</label>
+                            <select id="convertSourceId" class="form-select">
+                                <option value="">Select item...</option>
+                                <?php foreach ($items as $it): ?>
+                                <option value="<?= $it['id'] ?>"
+                                    data-width="<?= (float)$it['width_inches'] ?>"
+                                    data-sku="<?= h($it['sku']) ?>"
+                                    data-on-hand="<?= (int)$it['quantity_on_hand'] ?>">
+                                    <?= h($it['sku']) ?> (<?= width_label($it) ?>, on hand: <?= (int)$it['quantity_on_hand'] ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Qty to Convert</label>
+                            <input type="number" id="convertSourceQty" class="form-control" min="1" step="1" value="1">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Target Width</label>
+                            <select id="convertTargetWidth" class="form-select">
+                                <?php foreach ($standard_widths as $w): ?>
+                                <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-primary w-100" onclick="calcConvert()">Preview</button>
+                        </div>
+                    </div>
+                    <div id="convertError" class="alert alert-danger d-none"></div>
+                </div>
+
+                <!-- Step 2: line items preview -->
+                <div id="convertStep2" class="d-none">
+                    <p class="text-muted small mb-2" id="convertSummaryText"></p>
+                    <table class="table table-sm table-bordered mb-3" id="convertLinesTable">
+                        <thead><tr>
+                            <th>Target Width</th>
+                            <th style="width:120px">Qty</th>
+                            <th style="width:50px"></th>
+                        </tr></thead>
+                        <tbody id="convertLinesBody"></tbody>
+                    </table>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="resetConvert()">← Back</button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveConvert()">Save Conversion</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden convert save form -->
+<form id="convertSaveForm" method="post" style="display:none">
+    <input type="hidden" name="convert_source_item_id" id="cSrcId">
+    <input type="hidden" name="convert_source_qty" id="cSrcQty">
+    <div id="cLinesContainer"></div>
+</form>
+
 <script>
 function openAdjust(itemId, sku) {
     document.getElementById('adjustItemId').value  = itemId;
@@ -279,6 +387,108 @@ function updateQtyLabel() {
         document.getElementById('qtyLabel').textContent = 'Quantity to Add';
         document.getElementById('qtyHint').textContent  = 'Enter a positive number to add stock.';
     }
+}
+
+function calcConvert() {
+    const srcSel  = document.getElementById('convertSourceId');
+    const srcQty  = parseInt(document.getElementById('convertSourceQty').value) || 0;
+    const tgtW    = parseFloat(document.getElementById('convertTargetWidth').value);
+    const errEl   = document.getElementById('convertError');
+
+    errEl.classList.add('d-none');
+
+    if (!srcSel.value || srcQty < 1) {
+        errEl.textContent = 'Select a source item and enter a valid quantity.';
+        errEl.classList.remove('d-none');
+        return;
+    }
+
+    const opt      = srcSel.options[srcSel.selectedIndex];
+    const srcWidth = parseFloat(opt.dataset.width);
+    const srcSku   = opt.dataset.sku;
+    const onHand   = parseInt(opt.dataset.onHand);
+
+    if (srcQty > onHand) {
+        errEl.textContent = `Only ${onHand} on hand.`;
+        errEl.classList.remove('d-none');
+        return;
+    }
+
+    if (tgtW >= srcWidth) {
+        errEl.textContent = `Target width (${tgtW}") must be smaller than source width (${srcWidth}").`;
+        errEl.classList.remove('d-none');
+        return;
+    }
+
+    const rollsPerSrc   = Math.floor(srcWidth / tgtW);
+    const leftoverRaw   = srcWidth - (rollsPerSrc * tgtW);
+    const leftoverUsable = Math.floor(leftoverRaw / 0.5) * 0.5;
+
+    const lines = [];
+    lines.push({ width: tgtW, qty: rollsPerSrc * srcQty });
+    if (leftoverUsable >= 0.5) {
+        lines.push({ width: leftoverUsable, qty: srcQty });
+    }
+
+    document.getElementById('convertSummaryText').textContent =
+        `Converting ${srcQty}x ${srcSku} (${srcWidth}") → ${rollsPerSrc} rolls of ${tgtW}" per source` +
+        (leftoverUsable >= 0.5 ? ` + ${leftoverUsable}" leftover per source` : ' (no usable leftover)');
+
+    const tbody = document.getElementById('convertLinesBody');
+    tbody.innerHTML = '';
+    lines.forEach((ln, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${ln.width}"</td>
+            <td><input type="number" class="form-control form-control-sm" value="${ln.qty}" min="0" step="1" data-line="${i}" onchange="updateLineQty(this)"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)">✕</button></td>`;
+        tr.dataset.width = ln.width;
+        tr.dataset.qty   = ln.qty;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('convertStep2').classList.remove('d-none');
+}
+
+function updateLineQty(input) {
+    input.closest('tr').dataset.qty = input.value;
+}
+
+function removeLine(btn) {
+    btn.closest('tr').remove();
+}
+
+function resetConvert() {
+    document.getElementById('convertStep2').classList.add('d-none');
+    document.getElementById('convertError').classList.add('d-none');
+}
+
+function saveConvert() {
+    const srcId  = document.getElementById('convertSourceId').value;
+    const srcQty = document.getElementById('convertSourceQty').value;
+    const rows   = document.querySelectorAll('#convertLinesBody tr');
+
+    document.getElementById('cSrcId').value  = srcId;
+    document.getElementById('cSrcQty').value = srcQty;
+
+    const container = document.getElementById('cLinesContainer');
+    container.innerHTML = '';
+    let i = 0;
+    rows.forEach(tr => {
+        const qty = parseInt(tr.dataset.qty) || 0;
+        if (qty > 0) {
+            container.innerHTML += `<input type="hidden" name="convert_lines[${i}][width]" value="${tr.dataset.width}">`;
+            container.innerHTML += `<input type="hidden" name="convert_lines[${i}][qty]" value="${qty}">`;
+            i++;
+        }
+    });
+
+    if (i === 0) {
+        alert('No lines with quantity > 0.');
+        return;
+    }
+
+    document.getElementById('convertSaveForm').submit();
 }
 </script>
 
