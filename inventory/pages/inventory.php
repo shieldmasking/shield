@@ -325,15 +325,13 @@ render_header('Inventory', 'inventory');
                                     <?php endforeach; ?>
                                 </select>
                                 <input type="number" class="form-control form-control-sm cg-qty" style="width:70px" min="1" step="1" value="1" title="Qty">
-                                <select class="form-select form-select-sm cg-first-width" style="width:90px">
+                                <select class="form-select form-select-sm cg-widths" multiple size="5" style="width:90px">
                                     <?php foreach ($standard_widths as $w): ?>
                                     <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addGroupWidth(this)">+ Width</button>
                                 <button type="button" class="btn btn-outline-danger btn-sm cg-remove" onclick="removeSourceGroup(this)" disabled>✕</button>
                             </div>
-                            <div class="cg-extra-widths mt-1 ps-1"></div>
                         </div>
                     </div>
                     <div class="mt-2">
@@ -408,11 +406,9 @@ function addSourceGroup() {
     div.innerHTML = `<div class="d-flex gap-2 align-items-center">
         <select class="form-select form-select-sm cg-item" style="max-width:240px">${convertItemOptionsHTML}</select>
         <input type="number" class="form-control form-control-sm cg-qty" style="width:70px" min="1" step="1" value="1" title="Qty">
-        <select class="form-select form-select-sm cg-first-width" style="width:90px">${convertWidthOptionsHTML}</select>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addGroupWidth(this)">+ Width</button>
+        <select class="form-select form-select-sm cg-widths" multiple size="5" style="width:90px">${convertWidthOptionsHTML}</select>
         <button type="button" class="btn btn-outline-danger btn-sm cg-remove" onclick="removeSourceGroup(this)">✕</button>
-    </div>
-    <div class="cg-extra-widths mt-1 ps-1"></div>`;
+    </div>`;
     container.appendChild(div);
     updateGroupRemoveButtons();
 }
@@ -427,14 +423,6 @@ function updateGroupRemoveButtons() {
     btns.forEach(b => b.disabled = btns.length === 1);
 }
 
-function addGroupWidth(btn) {
-    const extraDiv = btn.closest('.convert-group').querySelector('.cg-extra-widths');
-    const d = document.createElement('div');
-    d.className = 'd-flex gap-2 align-items-center mt-1 cg-extra-row';
-    d.innerHTML = `<select class="form-select form-select-sm cg-extra-width" style="width:90px">${convertWidthOptionsHTML}</select>
-        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.cg-extra-row').remove()">✕</button>`;
-    extraDiv.appendChild(d);
-}
 
 function calcConvert() {
     const errEl = document.getElementById('convertError');
@@ -468,9 +456,7 @@ function calcConvert() {
             hasError = true; return;
         }
 
-        const firstW  = parseFloat(group.querySelector('.cg-first-width').value);
-        const extraWs = Array.from(group.querySelectorAll('.cg-extra-width')).map(s => parseFloat(s.value));
-        const tgtWidths = [firstW, ...extraWs];
+        const tgtWidths = Array.from(group.querySelector('.cg-widths').selectedOptions).map(o => parseFloat(o.value));
 
         if (tgtWidths.some(w => w >= srcWidth)) {
             errEl.textContent = `Target widths must be smaller than source (${srcWidth}") for ${srcSku}.`;
@@ -549,7 +535,6 @@ function resetConvert() {
     document.getElementById('convertStep2').classList.add('d-none');
     document.getElementById('convertError').classList.add('d-none');
     document.querySelectorAll('.convert-group:not(:first-child)').forEach(g => g.remove());
-    document.querySelector('.cg-extra-widths').innerHTML = '';
     updateGroupRemoveButtons();
 }
 
