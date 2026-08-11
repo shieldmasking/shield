@@ -50,7 +50,7 @@ if ($filter_w_max !== null) {
 $sql = "
     SELECT i.id, i.sku, i.width_inches, i.quantity_on_hand,
            p.name, p.description, p.land_cost_base, p.markup_multiplier,
-           p.is_log, p.is_fixed_width, p.roll_length_yards,
+           p.is_log, p.is_fixed_width, p.roll_length_yards, p.thickness_mm,
            c.id AS cat_id, c.name AS category_name
     FROM items i
     JOIN products p ON p.base_sku = i.base_sku
@@ -184,7 +184,10 @@ shop_header('Shop', 'products');
                                 <div class="small mb-1">
                                     Width: <?= h(format_width((float)$p['width_inches'])) ?>
                                     <?php if ($p['roll_length_yards']): ?>
-                                        &nbsp;&middot;&nbsp; <?= h((string)$p['roll_length_yards']) ?> yd
+                                        &nbsp;&middot;&nbsp; <?= (int)$p['roll_length_yards'] ?>yd
+                                    <?php endif; ?>
+                                    <?php if ($p['thickness_mm']): ?>
+                                        &nbsp;&middot;&nbsp; <?= rtrim(rtrim(number_format((float)$p['thickness_mm'], 2), '0'), '.') ?>mm
                                     <?php endif; ?>
                                 </div>
                                 <?php if (!empty($p['description'])): ?>
