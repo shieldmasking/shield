@@ -10,28 +10,29 @@ require_login();
 $db = db();
 
 // Handle convert POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_source_item_id'])) {
-    $src_id  = (int)$_POST['convert_source_item_id'];
-    $src_qty = (int)$_POST['convert_source_qty'];
-    $lines   = $_POST['convert_lines'] ?? [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_groups'])) {
+    $src_stmt = $db->prepare('SELECT i.*, p.is_log FROM items i JOIN products p ON p.base_sku = i.base_sku WHERE i.id = ?');
 
-    if ($src_id && $src_qty > 0 && !empty($lines)) {
-        $src_stmt = $db->prepare('SELECT i.*, p.is_log FROM items i JOIN products p ON p.base_sku = i.base_sku WHERE i.id = ?');
+    foreach ($_POST['convert_groups'] as $group) {
+        $src_id  = (int)($group['item_id'] ?? 0);
+        $src_qty = (int)($group['qty'] ?? 0);
+        $lines   = $group['lines'] ?? [];
+
+        if (!$src_id || $src_qty <= 0 || empty($lines)) continue;
+
         $src_stmt->execute([$src_id]);
         $src_row = $src_stmt->fetch();
+        if (!$src_row) continue;
 
-        if ($src_row) {
-            $base_sku = $src_row['base_sku'];
-            adjust_inventory($db, $src_id, -$src_qty, "Converted {$src_qty}x {$src_row['sku']} to rolls", 'convert', null, current_user_id());
+        adjust_inventory($db, $src_id, -$src_qty, "Converted {$src_qty}x {$src_row['sku']} to rolls", 'convert', null, current_user_id());
 
-            foreach ($lines as $line) {
-                $width = (float)($line['width'] ?? 0);
-                $qty   = (int)($line['qty'] ?? 0);
-                if ($width > 0 && $qty > 0) {
-                    $tgt_id = find_or_create_item($db, $base_sku, $width, false);
-                    if ($tgt_id) {
-                        adjust_inventory($db, $tgt_id, $qty, "Converted from {$src_row['sku']}", 'convert', null, current_user_id());
-                    }
+        foreach ($lines as $line) {
+            $width = (float)($line['width'] ?? 0);
+            $qty   = (int)($line['qty'] ?? 0);
+            if ($width > 0 && $qty > 0) {
+                $tgt_id = find_or_create_item($db, $src_row['base_sku'], $width, false);
+                if ($tgt_id) {
+                    adjust_inventory($db, $tgt_id, $qty, "Converted from {$src_row['sku']}", 'convert', null, current_user_id());
                 }
             }
         }
@@ -306,50 +307,57 @@ render_header('Inventory', 'inventory');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Convert Roll / Log</h5>
+                <button type="button" class="btn btn-outline-secondary btn-sm me-2" id="addItemBtn" onclick="addSourceGroup()">+ Add Item</button>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <!-- Step 1: inputs -->
                 <div id="convertStep1">
-                    <div class="d-flex gap-2 align-items-center mb-2">
-                        <select id="convertSourceId" class="form-select form-select-sm" style="max-width:260px">
-                            <option value="">Source item...</option>
-                            <?php foreach ($items as $it): ?>
-                            <option value="<?= $it['id'] ?>"
-                                data-width="<?= (float)$it['width_inches'] ?>"
-                                data-sku="<?= h($it['sku']) ?>"
-                                data-on-hand="<?= (int)$it['quantity_on_hand'] ?>">
-                                <?= h($it['sku']) ?> (<?= width_label($it) ?>, on hand: <?= (int)$it['quantity_on_hand'] ?>)
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <input type="number" id="convertSourceQty" class="form-control form-control-sm" style="width:70px" min="1" step="1" value="1" title="Qty to convert">
-                        <select class="form-select form-select-sm convert-tgt-width" style="width:90px" id="convertFirstWidth">
-                            <?php foreach ($standard_widths as $w): ?>
-                            <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addTgtRow()">+ Width</button>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="calcConvert()">Convert</button>
+                    <div id="convertGroups">
+                        <div class="convert-group mb-2">
+                            <div class="d-flex gap-2 align-items-center">
+                                <select class="form-select form-select-sm cg-item" style="max-width:240px">
+                                    <option value="">Source item...</option>
+                                    <?php foreach ($items as $it): ?>
+                                    <option value="<?= $it['id'] ?>" data-width="<?= (float)$it['width_inches'] ?>" data-sku="<?= h($it['sku']) ?>" data-on-hand="<?= (int)$it['quantity_on_hand'] ?>">
+                                        <?= h($it['sku']) ?> (<?= width_label($it) ?>, on hand: <?= (int)$it['quantity_on_hand'] ?>)
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input type="number" class="form-control form-control-sm cg-qty" style="width:70px" min="1" step="1" value="1" title="Qty">
+                                <select class="form-select form-select-sm cg-first-width" style="width:90px">
+                                    <?php foreach ($standard_widths as $w): ?>
+                                    <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addGroupWidth(this)">+ Width</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm cg-remove" onclick="removeSourceGroup(this)" disabled>✕</button>
+                            </div>
+                            <div class="cg-extra-widths mt-1 ps-1"></div>
+                        </div>
                     </div>
-                    <div id="convertExtraWidths"></div>
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="calcConvert()">Preview</button>
+                    </div>
                     <div id="convertError" class="alert alert-danger d-none mt-2"></div>
                 </div>
 
                 <!-- Step 2: line items preview -->
                 <div id="convertStep2" class="d-none">
                     <p class="text-muted small mb-2" id="convertSummaryText"></p>
-                    <table class="table table-sm table-bordered mb-3" id="convertLinesTable">
+                    <table class="table table-sm table-bordered mb-3">
                         <thead><tr>
-                            <th>Target Width</th>
-                            <th style="width:120px">Qty</th>
-                            <th style="width:50px"></th>
+                            <th>Source</th>
+                            <th>Width</th>
+                            <th style="width:110px">Qty</th>
+                            <th style="width:44px"></th>
                         </tr></thead>
                         <tbody id="convertLinesBody"></tbody>
                     </table>
                     <div class="d-flex gap-2 align-items-center flex-wrap">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="resetConvert()">← Back</button>
-                        <div class="d-flex gap-1 ms-auto">
+                        <div class="d-flex gap-1 ms-auto align-items-center">
+                            <select id="addLineGroup" class="form-select form-select-sm" style="width:auto"></select>
                             <select id="addLineWidth" class="form-select form-select-sm" style="width:auto">
                                 <?php foreach ($standard_widths as $w): ?>
                                 <option value="<?= $w ?>"><?= format_width($w) ?></option>
@@ -357,7 +365,7 @@ render_header('Inventory', 'inventory');
                             </select>
                             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addOutputLine()">+ Add Line</button>
                         </div>
-                        <button type="button" class="btn btn-success btn-sm" onclick="saveConvert()">Save Conversion</button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveConvert()">Save</button>
                     </div>
                 </div>
             </div>
@@ -367,8 +375,6 @@ render_header('Inventory', 'inventory');
 
 <!-- Hidden convert save form -->
 <form id="convertSaveForm" method="post" style="display:none">
-    <input type="hidden" name="convert_source_item_id" id="cSrcId">
-    <input type="hidden" name="convert_source_qty" id="cSrcQty">
     <div id="cLinesContainer"></div>
 </form>
 
@@ -389,83 +395,133 @@ function updateQtyLabel() {
 }
 
 const convertWidthOptions = <?= json_encode(array_map(fn($w) => ['v' => $w, 'l' => format_width($w)], $standard_widths)) ?>;
+const convertItemOptionsHTML = <?= json_encode('<option value="">Source item...</option>' . implode('', array_map(fn($it) =>
+    '<option value="' . $it['id'] . '" data-width="' . (float)$it['width_inches'] . '" data-sku="' . h($it['sku']) . '" data-on-hand="' . (int)$it['quantity_on_hand'] . '">' .
+    h($it['sku']) . ' (' . width_label($it) . ', on hand: ' . (int)$it['quantity_on_hand'] . ')</option>',
+    $items))) ?>;
+const convertWidthOptionsHTML = convertWidthOptions.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
 
-function addTgtRow() {
+function addSourceGroup() {
+    const container = document.getElementById('convertGroups');
     const div = document.createElement('div');
-    div.className = 'd-flex gap-2 align-items-center mt-1 convert-extra-row';
-    div.innerHTML = `<select class="form-select form-select-sm convert-tgt-width" style="width:90px">${convertWidthOptions.map(o=>`<option value="${o.v}">${o.l}</option>`).join('')}</select>
-        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.convert-extra-row').remove()">✕</button>`;
-    document.getElementById('convertExtraWidths').appendChild(div);
+    div.className = 'convert-group mb-2';
+    div.innerHTML = `<div class="d-flex gap-2 align-items-center">
+        <select class="form-select form-select-sm cg-item" style="max-width:240px">${convertItemOptionsHTML}</select>
+        <input type="number" class="form-control form-control-sm cg-qty" style="width:70px" min="1" step="1" value="1" title="Qty">
+        <select class="form-select form-select-sm cg-first-width" style="width:90px">${convertWidthOptionsHTML}</select>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addGroupWidth(this)">+ Width</button>
+        <button type="button" class="btn btn-outline-danger btn-sm cg-remove" onclick="removeSourceGroup(this)">✕</button>
+    </div>
+    <div class="cg-extra-widths mt-1 ps-1"></div>`;
+    container.appendChild(div);
+    updateGroupRemoveButtons();
+}
+
+function removeSourceGroup(btn) {
+    btn.closest('.convert-group').remove();
+    updateGroupRemoveButtons();
+}
+
+function updateGroupRemoveButtons() {
+    const btns = document.querySelectorAll('.convert-group .cg-remove');
+    btns.forEach(b => b.disabled = btns.length === 1);
+}
+
+function addGroupWidth(btn) {
+    const extraDiv = btn.closest('.convert-group').querySelector('.cg-extra-widths');
+    const d = document.createElement('div');
+    d.className = 'd-flex gap-2 align-items-center mt-1 cg-extra-row';
+    d.innerHTML = `<select class="form-select form-select-sm cg-extra-width" style="width:90px">${convertWidthOptionsHTML}</select>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.cg-extra-row').remove()">✕</button>`;
+    extraDiv.appendChild(d);
 }
 
 function calcConvert() {
-    const srcSel  = document.getElementById('convertSourceId');
-    const srcQty  = parseInt(document.getElementById('convertSourceQty').value) || 0;
-    const errEl   = document.getElementById('convertError');
+    const errEl = document.getElementById('convertError');
     errEl.classList.add('d-none');
 
-    if (!srcSel.value || srcQty < 1) {
-        errEl.textContent = 'Select a source item and enter a valid quantity.';
-        errEl.classList.remove('d-none');
-        return;
-    }
+    const groups = document.querySelectorAll('.convert-group');
+    const tbody  = document.getElementById('convertLinesBody');
+    tbody.innerHTML = '';
+    const summaries = [];
+    let hasError = false;
 
-    const opt      = srcSel.options[srcSel.selectedIndex];
-    const srcWidth = parseFloat(opt.dataset.width);
-    const srcSku   = opt.dataset.sku;
-    const onHand   = parseInt(opt.dataset.onHand);
+    groups.forEach((group, gi) => {
+        const itemSel = group.querySelector('.cg-item');
+        const srcQty  = parseInt(group.querySelector('.cg-qty').value) || 0;
 
-    if (srcQty > onHand) {
-        errEl.textContent = `Only ${onHand} on hand.`;
-        errEl.classList.remove('d-none');
-        return;
-    }
+        if (!itemSel.value || srcQty < 1) {
+            errEl.textContent = 'All rows must have a source item and quantity.';
+            errEl.classList.remove('d-none');
+            hasError = true; return;
+        }
 
-    const tgtSelects = [document.getElementById('convertFirstWidth'), ...document.querySelectorAll('#convertExtraWidths .convert-tgt-width')];
-    const tgtWidths  = tgtSelects.map(s => parseFloat(s.value));
+        const opt      = itemSel.options[itemSel.selectedIndex];
+        const srcWidth = parseFloat(opt.dataset.width);
+        const srcSku   = opt.dataset.sku;
+        const onHand   = parseInt(opt.dataset.onHand);
+        const itemId   = itemSel.value;
 
-    if (tgtWidths.some(w => w >= srcWidth)) {
-        errEl.textContent = `All target widths must be smaller than source width (${srcWidth}").`;
-        errEl.classList.remove('d-none');
-        return;
-    }
+        if (srcQty > onHand) {
+            errEl.textContent = `Only ${onHand} on hand for ${srcSku}.`;
+            errEl.classList.remove('d-none');
+            hasError = true; return;
+        }
 
-    // Calculate sequentially: each width cuts from remaining material
-    const lines = [];
-    let remaining = srcWidth;
-    const summaryParts = [];
+        const firstW  = parseFloat(group.querySelector('.cg-first-width').value);
+        const extraWs = Array.from(group.querySelectorAll('.cg-extra-width')).map(s => parseFloat(s.value));
+        const tgtWidths = [firstW, ...extraWs];
 
-    tgtWidths.forEach(tgtW => {
-        if (remaining < tgtW) return;
-        const rollsPer = Math.floor(remaining / tgtW);
-        remaining = remaining - (rollsPer * tgtW);
-        lines.push({ width: tgtW, qty: rollsPer * srcQty });
-        summaryParts.push(`${rollsPer}×${tgtW}"`);
+        if (tgtWidths.some(w => w >= srcWidth)) {
+            errEl.textContent = `Target widths must be smaller than source (${srcWidth}") for ${srcSku}.`;
+            errEl.classList.remove('d-none');
+            hasError = true; return;
+        }
+
+        let remaining = srcWidth;
+        const parts = [];
+
+        tgtWidths.forEach(tgtW => {
+            if (remaining < tgtW) return;
+            const rollsPer = Math.floor(remaining / tgtW);
+            remaining -= rollsPer * tgtW;
+            appendOutputLine(srcSku, itemId, gi, tgtW, rollsPer * srcQty);
+            parts.push(`${rollsPer}×${tgtW}"`);
+        });
+
+        const leftover = Math.floor(remaining / 0.5) * 0.5;
+        if (leftover >= 0.5) {
+            appendOutputLine(srcSku, itemId, gi, leftover, srcQty);
+            parts.push(`${leftover}" leftover`);
+        }
+
+        summaries.push(`${srcQty}×${srcSku}: ${parts.join(', ') || 'nothing fits'}`);
     });
 
-    // Leftover from remaining material
-    const leftoverUsable = Math.floor(remaining / 0.5) * 0.5;
-    if (leftoverUsable >= 0.5) {
-        lines.push({ width: leftoverUsable, qty: srcQty });
-        summaryParts.push(`${leftoverUsable}" leftover`);
-    }
+    if (hasError) return;
 
-    document.getElementById('convertSummaryText').textContent =
-        `${srcQty}x ${srcSku} (${srcWidth}") → per source: ${summaryParts.join(', ') || 'nothing fits'}`;
+    document.getElementById('convertSummaryText').textContent = summaries.join(' | ');
 
-    const tbody = document.getElementById('convertLinesBody');
-    tbody.innerHTML = '';
-    lines.forEach(ln => appendOutputLine(ln.width, ln.qty));
+    // Populate group selector for Add Line
+    const groupSel = document.getElementById('addLineGroup');
+    groupSel.innerHTML = '';
+    groups.forEach((g, i) => {
+        const opt = g.querySelector('.cg-item').options[g.querySelector('.cg-item').selectedIndex];
+        groupSel.innerHTML += `<option value="${i}">${opt?.dataset?.sku || 'Group '+(i+1)}</option>`;
+    });
 
     document.getElementById('convertStep2').classList.remove('d-none');
 }
 
-function appendOutputLine(width, qty) {
+function appendOutputLine(srcSku, itemId, groupIdx, width, qty) {
     const tbody = document.getElementById('convertLinesBody');
     const tr = document.createElement('tr');
-    tr.dataset.width = width;
-    tr.dataset.qty   = qty;
+    tr.dataset.width    = width;
+    tr.dataset.qty      = qty;
+    tr.dataset.groupIdx = groupIdx;
+    tr.dataset.itemId   = itemId;
     tr.innerHTML = `
+        <td class="text-muted small">${srcSku}</td>
         <td>${width}"</td>
         <td><input type="number" class="form-control form-control-sm" value="${qty}" min="0" step="1" onchange="updateLineQty(this)"></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)">✕</button></td>`;
@@ -473,8 +529,12 @@ function appendOutputLine(width, qty) {
 }
 
 function addOutputLine() {
-    const w = parseFloat(document.getElementById('addLineWidth').value);
-    appendOutputLine(w, 0);
+    const gi      = parseInt(document.getElementById('addLineGroup').value);
+    const groups  = document.querySelectorAll('.convert-group');
+    const group   = groups[gi];
+    const itemSel = group.querySelector('.cg-item');
+    const w       = parseFloat(document.getElementById('addLineWidth').value);
+    appendOutputLine(itemSel.options[itemSel.selectedIndex].dataset.sku, itemSel.value, gi, w, 0);
 }
 
 function updateLineQty(input) {
@@ -488,34 +548,44 @@ function removeLine(btn) {
 function resetConvert() {
     document.getElementById('convertStep2').classList.add('d-none');
     document.getElementById('convertError').classList.add('d-none');
-    document.getElementById('convertExtraWidths').innerHTML = '';
+    document.querySelectorAll('.convert-group:not(:first-child)').forEach(g => g.remove());
+    document.querySelector('.cg-extra-widths').innerHTML = '';
+    updateGroupRemoveButtons();
 }
 
 function saveConvert() {
-    const srcId  = document.getElementById('convertSourceId').value;
-    const srcQty = document.getElementById('convertSourceQty').value;
-    const rows   = document.querySelectorAll('#convertLinesBody tr');
-
-    document.getElementById('cSrcId').value  = srcId;
-    document.getElementById('cSrcQty').value = srcQty;
-
+    const rows    = document.querySelectorAll('#convertLinesBody tr');
+    const groupEls = document.querySelectorAll('.convert-group');
     const container = document.getElementById('cLinesContainer');
     container.innerHTML = '';
-    let i = 0;
-    rows.forEach(tr => {
-        const qty = parseInt(tr.dataset.qty) || 0;
-        if (qty > 0) {
-            container.innerHTML += `<input type="hidden" name="convert_lines[${i}][width]" value="${tr.dataset.width}">`;
-            container.innerHTML += `<input type="hidden" name="convert_lines[${i}][qty]" value="${qty}">`;
-            i++;
-        }
+
+    // Build per-group buckets
+    const groups = {};
+    groupEls.forEach((g, gi) => {
+        const itemSel = g.querySelector('.cg-item');
+        groups[gi] = { itemId: itemSel.value, qty: g.querySelector('.cg-qty').value, lines: [] };
     });
 
-    if (i === 0) {
-        alert('No lines with quantity > 0.');
-        return;
-    }
+    rows.forEach(tr => {
+        const qty = parseInt(tr.dataset.qty) || 0;
+        if (qty <= 0) return;
+        const gi = parseInt(tr.dataset.groupIdx);
+        if (groups[gi]) groups[gi].lines.push({ width: tr.dataset.width, qty });
+    });
 
+    let gi = 0, hasLines = false;
+    Object.values(groups).forEach(g => {
+        if (!g.lines.length) return;
+        container.innerHTML += `<input type="hidden" name="convert_groups[${gi}][item_id]" value="${g.itemId}">`;
+        container.innerHTML += `<input type="hidden" name="convert_groups[${gi}][qty]" value="${g.qty}">`;
+        g.lines.forEach((ln, li) => {
+            container.innerHTML += `<input type="hidden" name="convert_groups[${gi}][lines][${li}][width]" value="${ln.width}">`;
+            container.innerHTML += `<input type="hidden" name="convert_groups[${gi}][lines][${li}][qty]" value="${ln.qty}">`;
+        });
+        gi++; hasLines = true;
+    });
+
+    if (!hasLines) { alert('No lines with quantity > 0.'); return; }
     document.getElementById('convertSaveForm').submit();
 }
 </script>
