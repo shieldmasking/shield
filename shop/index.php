@@ -17,13 +17,13 @@ $all_cats = $db->query("SELECT id, name FROM categories ORDER BY name")->fetchAl
 $widths_raw = $db->query("
     SELECT DISTINCT i.width_inches
     FROM items i
-    JOIN products p ON p.base_sku = i.base_sku
-    WHERE i.is_active = 1 AND i.quantity_on_hand > 0 AND p.is_log = 0
+    WHERE i.is_active = 1 AND i.quantity_on_hand > 0
+      AND i.sku NOT LIKE CONCAT(i.base_sku, '-L%')
     ORDER BY i.width_inches ASC
 ")->fetchAll(PDO::FETCH_COLUMN);
 
 // ── Product query ─────────────────────────────────────────────────────────────
-$where  = ['i.is_active = 1', 'i.quantity_on_hand > 0', 'p.is_log = 0'];
+$where  = ['i.is_active = 1', 'i.quantity_on_hand > 0', "i.sku NOT LIKE CONCAT(i.base_sku, '-L%')"];
 $params = [];
 
 if (!empty($filter_cats)) {
