@@ -312,7 +312,7 @@ render_header('Inventory', 'inventory');
                 <!-- Step 1: inputs -->
                 <div id="convertStep1">
                     <div class="row g-3 mb-3">
-                        <div class="col-md-5">
+                        <div class="col-md-6">
                             <label class="form-label">Source Item</label>
                             <select id="convertSourceId" class="form-select">
                                 <option value="">Select item...</option>
@@ -326,21 +326,31 @@ render_header('Inventory', 'inventory');
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label">Qty to Convert</label>
                             <input type="number" id="convertSourceQty" class="form-control" min="1" step="1" value="1">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Target Width</label>
-                            <select id="convertTargetWidth" class="form-select">
-                                <?php foreach ($standard_widths as $w): ?>
-                                <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="button" class="btn btn-primary w-100" onclick="calcConvert()">Preview</button>
-                        </div>
+                    </div>
+                    <label class="form-label">Target Widths <small class="text-muted">(cut in order listed)</small></label>
+                    <table class="table table-sm mb-2" id="convertTargetTable">
+                        <tbody id="convertTargetBody">
+                            <tr>
+                                <td>
+                                    <select class="form-select form-select-sm convert-tgt-width">
+                                        <?php foreach ($standard_widths as $w): ?>
+                                        <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
+                                <td style="width:50px" class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTgtRow(this)" disabled>✕</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addTgtRow()">+ Add Width</button>
+                        <button type="button" class="btn btn-primary btn-sm ms-auto" onclick="calcConvert()">Preview</button>
                     </div>
                     <div id="convertError" class="alert alert-danger d-none"></div>
                 </div>
@@ -356,8 +366,16 @@ render_header('Inventory', 'inventory');
                         </tr></thead>
                         <tbody id="convertLinesBody"></tbody>
                     </table>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="resetConvert()">← Back</button>
+                        <div class="d-flex gap-1 ms-auto">
+                            <select id="addLineWidth" class="form-select form-select-sm" style="width:auto">
+                                <?php foreach ($standard_widths as $w): ?>
+                                <option value="<?= $w ?>"><?= format_width($w) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addOutputLine()">+ Add Line</button>
+                        </div>
                         <button type="button" class="btn btn-success btn-sm" onclick="saveConvert()">Save Conversion</button>
                     </div>
                 </div>
@@ -389,12 +407,31 @@ function updateQtyLabel() {
     }
 }
 
+const convertWidthOptions = <?= json_encode(array_map(fn($w) => ['v' => $w, 'l' => format_width($w)], $standard_widths)) ?>;
+
+function addTgtRow() {
+    const tbody = document.getElementById('convertTargetBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><select class="form-select form-select-sm convert-tgt-width">${convertWidthOptions.map(o=>`<option value="${o.v}">${o.l}</option>`).join('')}</select></td>
+        <td style="width:50px" class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTgtRow(this)">✕</button></td>`;
+    tbody.appendChild(tr);
+    updateRemoveButtons();
+}
+
+function removeTgtRow(btn) {
+    btn.closest('tr').remove();
+    updateRemoveButtons();
+}
+
+function updateRemoveButtons() {
+    const btns = document.querySelectorAll('#convertTargetBody .btn-outline-danger');
+    btns.forEach(b => b.disabled = btns.length === 1);
+}
+
 function calcConvert() {
     const srcSel  = document.getElementById('convertSourceId');
     const srcQty  = parseInt(document.getElementById('convertSourceQty').value) || 0;
-    const tgtW    = parseFloat(document.getElementById('convertTargetWidth').value);
     const errEl   = document.getElementById('convertError');
-
     errEl.classList.add('d-none');
 
     if (!srcSel.value || srcQty < 1) {
@@ -414,40 +451,60 @@ function calcConvert() {
         return;
     }
 
-    if (tgtW >= srcWidth) {
-        errEl.textContent = `Target width (${tgtW}") must be smaller than source width (${srcWidth}").`;
+    const tgtSelects = document.querySelectorAll('.convert-tgt-width');
+    const tgtWidths  = Array.from(tgtSelects).map(s => parseFloat(s.value));
+
+    if (tgtWidths.some(w => w >= srcWidth)) {
+        errEl.textContent = `All target widths must be smaller than source width (${srcWidth}").`;
         errEl.classList.remove('d-none');
         return;
     }
 
-    const rollsPerSrc   = Math.floor(srcWidth / tgtW);
-    const leftoverRaw   = srcWidth - (rollsPerSrc * tgtW);
-    const leftoverUsable = Math.floor(leftoverRaw / 0.5) * 0.5;
-
+    // Calculate sequentially: each width cuts from remaining material
     const lines = [];
-    lines.push({ width: tgtW, qty: rollsPerSrc * srcQty });
+    let remaining = srcWidth;
+    const summaryParts = [];
+
+    tgtWidths.forEach(tgtW => {
+        if (remaining < tgtW) return;
+        const rollsPer = Math.floor(remaining / tgtW);
+        remaining = remaining - (rollsPer * tgtW);
+        lines.push({ width: tgtW, qty: rollsPer * srcQty });
+        summaryParts.push(`${rollsPer}×${tgtW}"`);
+    });
+
+    // Leftover from remaining material
+    const leftoverUsable = Math.floor(remaining / 0.5) * 0.5;
     if (leftoverUsable >= 0.5) {
         lines.push({ width: leftoverUsable, qty: srcQty });
+        summaryParts.push(`${leftoverUsable}" leftover`);
     }
 
     document.getElementById('convertSummaryText').textContent =
-        `Converting ${srcQty}x ${srcSku} (${srcWidth}") → ${rollsPerSrc} rolls of ${tgtW}" per source` +
-        (leftoverUsable >= 0.5 ? ` + ${leftoverUsable}" leftover per source` : ' (no usable leftover)');
+        `${srcQty}x ${srcSku} (${srcWidth}") → per source: ${summaryParts.join(', ') || 'nothing fits'}`;
 
     const tbody = document.getElementById('convertLinesBody');
     tbody.innerHTML = '';
-    lines.forEach((ln, i) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${ln.width}"</td>
-            <td><input type="number" class="form-control form-control-sm" value="${ln.qty}" min="0" step="1" data-line="${i}" onchange="updateLineQty(this)"></td>
-            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)">✕</button></td>`;
-        tr.dataset.width = ln.width;
-        tr.dataset.qty   = ln.qty;
-        tbody.appendChild(tr);
-    });
+    lines.forEach(ln => appendOutputLine(ln.width, ln.qty));
 
     document.getElementById('convertStep2').classList.remove('d-none');
+}
+
+function appendOutputLine(width, qty) {
+    const tbody = document.getElementById('convertLinesBody');
+    const tr = document.createElement('tr');
+    tr.dataset.width = width;
+    tr.dataset.qty   = qty;
+    tr.innerHTML = `
+        <td>${width}"</td>
+        <td><input type="number" class="form-control form-control-sm" value="${qty}" min="0" step="1" onchange="updateLineQty(this)"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)">✕</button></td>`;
+    tbody.appendChild(tr);
+}
+
+function addOutputLine() {
+    const w = parseFloat(document.getElementById('addLineWidth').value);
+    appendOutputLine(w, 0);
 }
 
 function updateLineQty(input) {
