@@ -2,17 +2,14 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-require_once __DIR__ . '/../../inventory/config.php';
+// Session first — before any output or requires that might emit whitespace
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+// Do NOT require config.php here — db() loads it inside its own scope
 require_once __DIR__ . '/../../inventory/inc/db.php';
 require_once __DIR__ . '/../../inventory/inc/functions.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if (!isset($_SESSION['shop_cart'])) {
-    $_SESSION['shop_cart'] = [];
-}
+if (!isset($_SESSION['shop_cart'])) $_SESSION['shop_cart'] = [];
 
 // ── Cart functions ────────────────────────────────────────────────────────────
 
