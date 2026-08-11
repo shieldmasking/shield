@@ -311,48 +311,29 @@ render_header('Inventory', 'inventory');
             <div class="modal-body">
                 <!-- Step 1: inputs -->
                 <div id="convertStep1">
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Source Item</label>
-                            <select id="convertSourceId" class="form-select">
-                                <option value="">Select item...</option>
-                                <?php foreach ($items as $it): ?>
-                                <option value="<?= $it['id'] ?>"
-                                    data-width="<?= (float)$it['width_inches'] ?>"
-                                    data-sku="<?= h($it['sku']) ?>"
-                                    data-on-hand="<?= (int)$it['quantity_on_hand'] ?>">
-                                    <?= h($it['sku']) ?> (<?= width_label($it) ?>, on hand: <?= (int)$it['quantity_on_hand'] ?>)
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Qty to Convert</label>
-                            <input type="number" id="convertSourceQty" class="form-control" min="1" step="1" value="1">
-                        </div>
+                    <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+                        <select id="convertSourceId" class="form-select form-select-sm flex-grow-1" style="min-width:200px">
+                            <option value="">Source item...</option>
+                            <?php foreach ($items as $it): ?>
+                            <option value="<?= $it['id'] ?>"
+                                data-width="<?= (float)$it['width_inches'] ?>"
+                                data-sku="<?= h($it['sku']) ?>"
+                                data-on-hand="<?= (int)$it['quantity_on_hand'] ?>">
+                                <?= h($it['sku']) ?> (<?= width_label($it) ?>, on hand: <?= (int)$it['quantity_on_hand'] ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <input type="number" id="convertSourceQty" class="form-control form-control-sm" style="width:70px" min="1" step="1" value="1" title="Qty to convert">
+                        <select class="form-select form-select-sm convert-tgt-width" style="width:90px" id="convertFirstWidth">
+                            <?php foreach ($standard_widths as $w): ?>
+                            <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addTgtRow()">+ Width</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="calcConvert()">Convert</button>
                     </div>
-                    <label class="form-label">Target Widths <small class="text-muted">(cut in order listed)</small></label>
-                    <table class="table table-sm mb-2" id="convertTargetTable">
-                        <tbody id="convertTargetBody">
-                            <tr>
-                                <td>
-                                    <select class="form-select form-select-sm convert-tgt-width">
-                                        <?php foreach ($standard_widths as $w): ?>
-                                        <option value="<?= $w ?>" <?= abs($w - 3.0) < 0.001 ? 'selected' : '' ?>><?= format_width($w) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </td>
-                                <td style="width:50px" class="text-end">
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTgtRow(this)" disabled>✕</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div class="d-flex gap-2 mb-3">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addTgtRow()">+ Add Width</button>
-                        <button type="button" class="btn btn-primary btn-sm ms-auto" onclick="calcConvert()">Preview</button>
-                    </div>
-                    <div id="convertError" class="alert alert-danger d-none"></div>
+                    <div id="convertExtraWidths"></div>
+                    <div id="convertError" class="alert alert-danger d-none mt-2"></div>
                 </div>
 
                 <!-- Step 2: line items preview -->
@@ -410,22 +391,11 @@ function updateQtyLabel() {
 const convertWidthOptions = <?= json_encode(array_map(fn($w) => ['v' => $w, 'l' => format_width($w)], $standard_widths)) ?>;
 
 function addTgtRow() {
-    const tbody = document.getElementById('convertTargetBody');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td><select class="form-select form-select-sm convert-tgt-width">${convertWidthOptions.map(o=>`<option value="${o.v}">${o.l}</option>`).join('')}</select></td>
-        <td style="width:50px" class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTgtRow(this)">✕</button></td>`;
-    tbody.appendChild(tr);
-    updateRemoveButtons();
-}
-
-function removeTgtRow(btn) {
-    btn.closest('tr').remove();
-    updateRemoveButtons();
-}
-
-function updateRemoveButtons() {
-    const btns = document.querySelectorAll('#convertTargetBody .btn-outline-danger');
-    btns.forEach(b => b.disabled = btns.length === 1);
+    const div = document.createElement('div');
+    div.className = 'd-flex gap-2 align-items-center mt-1 convert-extra-row';
+    div.innerHTML = `<select class="form-select form-select-sm convert-tgt-width" style="width:90px">${convertWidthOptions.map(o=>`<option value="${o.v}">${o.l}</option>`).join('')}</select>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.convert-extra-row').remove()">✕</button>`;
+    document.getElementById('convertExtraWidths').appendChild(div);
 }
 
 function calcConvert() {
@@ -451,8 +421,8 @@ function calcConvert() {
         return;
     }
 
-    const tgtSelects = document.querySelectorAll('.convert-tgt-width');
-    const tgtWidths  = Array.from(tgtSelects).map(s => parseFloat(s.value));
+    const tgtSelects = [document.getElementById('convertFirstWidth'), ...document.querySelectorAll('#convertExtraWidths .convert-tgt-width')];
+    const tgtWidths  = tgtSelects.map(s => parseFloat(s.value));
 
     if (tgtWidths.some(w => w >= srcWidth)) {
         errEl.textContent = `All target widths must be smaller than source width (${srcWidth}").`;
@@ -518,6 +488,7 @@ function removeLine(btn) {
 function resetConvert() {
     document.getElementById('convertStep2').classList.add('d-none');
     document.getElementById('convertError').classList.add('d-none');
+    document.getElementById('convertExtraWidths').innerHTML = '';
 }
 
 function saveConvert() {
