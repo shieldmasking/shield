@@ -311,8 +311,8 @@ render_header('Inventory', 'inventory');
             <div class="modal-body">
                 <!-- Step 1: inputs -->
                 <div id="convertStep1">
-                    <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
-                        <select id="convertSourceId" class="form-select form-select-sm flex-grow-1" style="min-width:200px">
+                    <div class="d-flex gap-2 align-items-center mb-2">
+                        <select id="convertSourceId" class="form-select form-select-sm" style="max-width:260px">
                             <option value="">Source item...</option>
                             <?php foreach ($items as $it): ?>
                             <option value="<?= $it['id'] ?>"
