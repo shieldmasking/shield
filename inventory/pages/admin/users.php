@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone = trim($_POST['phone'] ?? '');
         $pass  = $_POST['password'];
 
+        $role  = isset($_POST['role']) && $_POST['role'] === 'admin' ? 1 : 0;
         if (!$name || !$email || !$pass) {
             $msg = 'All fields required.';
         } elseif (strlen($pass) < 10) {
@@ -25,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = 'Invalid email.';
         } else {
             try {
-                $db->prepare('INSERT INTO users (name, email, phone, password_hash, force_password_change) VALUES (?,?,?,?,1)')
-                   ->execute([$name, $email, $phone ?: null, password_hash($pass, PASSWORD_DEFAULT)]);
+                $db->prepare('INSERT INTO users (name, email, phone, password_hash, force_password_change, is_admin) VALUES (?,?,?,?,1,?)')
+                   ->execute([$name, $email, $phone ?: null, password_hash($pass, PASSWORD_DEFAULT), $role]);
                 $msg = "User {$name} added.";
             } catch (PDOException $e) {
                 $msg = 'Email already exists.';
@@ -37,14 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name    = trim($_POST['name']);
         $email   = strtolower(trim($_POST['email']));
         $phone   = trim($_POST['phone'] ?? '');
+        $role    = isset($_POST['role']) && $_POST['role'] === 'admin' ? 1 : 0;
         if (!$name || !$email) {
             $msg = 'Name and email required.';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $msg = 'Invalid email.';
         } else {
             try {
-                $db->prepare('UPDATE users SET name=?, email=?, phone=? WHERE id=?')
-                   ->execute([$name, $email, $phone ?: null, $user_id]);
+                $db->prepare('UPDATE users SET name=?, email=?, phone=?, is_admin=? WHERE id=?')
+                   ->execute([$name, $email, $phone ?: null, $role, $user_id]);
                 $msg = 'User updated.';
             } catch (PDOException $e) {
                 $msg = 'Email already in use.';
@@ -100,7 +102,7 @@ render_header('Admin — Users', 'admin');
 <div class="card">
 <div class="card-body p-0">
 <table class="table table-hover mb-0 align-middle">
-<thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Failed Logins</th><th></th></tr></thead>
+<thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Failed Logins</th><th></th></tr></thead>
 <tbody>
 <?php foreach ($users as $u):
     $is_locked = $u['locked_until'] && new DateTime() < new DateTime($u['locked_until']);
@@ -109,6 +111,7 @@ render_header('Admin — Users', 'admin');
     <td><?= h($u['name']) ?></td>
     <td><?= h($u['email']) ?></td>
     <td><?= h($u['phone'] ?? '—') ?></td>
+    <td><?= $u['is_admin'] ? '<span class="badge bg-primary">Admin</span>' : '<span class="badge bg-secondary">Sales</span>' ?></td>
     <td><?= $is_locked ? '<span class="badge bg-danger">Locked</span>' : '<span class="badge bg-success">Active</span>' ?></td>
     <td><?= (int)$u['failed_attempts'] ?></td>
     <td class="text-end">
@@ -154,6 +157,11 @@ render_header('Admin — Users', 'admin');
         <input type="email" name="email" id="editEmail" class="form-control" required></div>
     <div class="mb-2"><label class="form-label">Phone</label>
         <input type="text" name="phone" id="editPhone" class="form-control"></div>
+    <div class="mb-2"><label class="form-label">Role</label>
+        <select name="role" id="editRole" class="form-select">
+            <option value="sales">Sales</option>
+            <option value="admin">Admin</option>
+        </select></div>
 </div>
 <div class="modal-footer">
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -175,6 +183,11 @@ render_header('Admin — Users', 'admin');
         <input type="email" name="email" class="form-control" required></div>
     <div class="mb-2"><label class="form-label">Phone</label>
         <input type="text" name="phone" class="form-control" placeholder="e.g. 555-555-5555"></div>
+    <div class="mb-2"><label class="form-label">Role</label>
+        <select name="role" class="form-select">
+            <option value="sales">Sales</option>
+            <option value="admin">Admin</option>
+        </select></div>
     <div class="mb-2"><label class="form-label">Password (min 10 chars)</label>
         <input type="password" name="password" class="form-control" required minlength="10"></div>
 </div>
@@ -209,6 +222,7 @@ function openEdit(u) {
     document.getElementById('editName').value   = u.name;
     document.getElementById('editEmail').value  = u.email;
     document.getElementById('editPhone').value  = u.phone || '';
+    document.getElementById('editRole').value   = u.is_admin == 1 ? 'admin' : 'sales';
 }
 function openReset(id, name) {
     document.getElementById('resetUserId').value = id;
