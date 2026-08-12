@@ -101,11 +101,11 @@ $sales_users   = [];
 if ($my_admin) {
     $assignments = $db->query('
         SELECT cs.id, cs.commission_pct, cs.customer_id, cs.user_id,
-               c.name AS customer_name, u.name AS user_name
+               COALESCE(NULLIF(c.company, \'\'), c.name) AS customer_name, u.name AS user_name
         FROM customer_sales cs
         JOIN customers c ON c.id = cs.customer_id
         JOIN users u     ON u.id = cs.user_id
-        ORDER BY c.name, u.name
+        ORDER BY customer_name, u.name
     ')->fetchAll();
 
     $all_customers = $db->query('SELECT id, name, company FROM customers ORDER BY company, name')->fetchAll();
