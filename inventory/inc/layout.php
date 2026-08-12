@@ -3,12 +3,15 @@ require_once __DIR__ . '/functions.php';
 
 function render_header(string $title, string $active = ''): void {
     $nav = [
-        'dashboard'  => ['Dashboard',  '/inventory/pages/dashboard.php'],
-        'inventory'  => ['Inventory',  '/inventory/pages/inventory.php'],
-        'orders'     => ['Orders',     '/inventory/pages/orders.php'],
-        'customers'  => ['Customers',  '/inventory/pages/customers.php'],
-        'admin'      => ['Admin',      '/inventory/pages/admin/index.php'],
+        'dashboard'   => ['Dashboard',   '/inventory/pages/dashboard.php'],
+        'inventory'   => ['Inventory',   '/inventory/pages/inventory.php'],
+        'orders'      => ['Orders',      '/inventory/pages/orders.php'],
+        'customers'   => ['Customers',   '/inventory/pages/customers.php'],
+        'commissions' => ['Commissions', '/inventory/pages/commissions.php'],
     ];
+    if (is_admin()) {
+        $nav['admin'] = ['Admin', '/inventory/pages/admin/index.php'];
+    }
     ?>
 <!DOCTYPE html>
 <html lang="en">
