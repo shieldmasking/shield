@@ -108,7 +108,7 @@ if ($my_admin) {
         ORDER BY c.name, u.name
     ')->fetchAll();
 
-    $all_customers = $db->query('SELECT id, name FROM customers ORDER BY name')->fetchAll();
+    $all_customers = $db->query('SELECT id, name, company FROM customers ORDER BY company, name')->fetchAll();
     $sales_users   = $db->query('SELECT id, name FROM users WHERE is_admin = 0 ORDER BY name')->fetchAll();
 }
 
@@ -224,7 +224,7 @@ render_header('Commissions', 'commissions');
                         <select name="customer_id" class="form-select" required>
                             <option value="">Select...</option>
                             <?php foreach ($all_customers as $c): ?>
-                            <option value="<?= $c['id'] ?>"><?= h($c['name']) ?></option>
+                            <option value="<?= $c['id'] ?>"><?= h($c['company'] ?: $c['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
