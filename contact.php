@@ -11,19 +11,33 @@ if (!$name || !$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
-$to      = 'rstrenger@shieldmasking.com';
-$subject = 'Sample Roll Request' . ($product ? " \xe2\x80\x94 {$product}" : '');
-$body    = "Name: {$name}\r\nEmail: {$email}\r\n"
-         . ($product ? "Product: {$product}\r\n" : '')
-         . ($message ? "\r\nMessage:\r\n{$message}" : '');
-$headers = implode("\r\n", [
-    "From: rstrenger@shieldmasking.com",
-    "Reply-To: {$email}",
-    "Content-Type: text/plain; charset=UTF-8",
-]);
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/mail_config.php';
 
-if (mail($to, $subject, $body, $headers)) {
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+
+$mail = new PHPMailer(true);
+try {
+    $mail->isSMTP();
+    $mail->Host       = 'smtpout.secureserver.net';
+    $mail->SMTPAuth   = true;
+    $mail->Username   = MAIL_USER;
+    $mail->Password   = MAIL_PASS;
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+    $mail->Port       = 465;
+
+    $mail->setFrom(MAIL_USER, 'Shield Masking Website');
+    $mail->addAddress('rstrenger@shieldmasking.com', 'Ryan Strenger');
+    $mail->addReplyTo($email, $name);
+
+    $mail->Subject = 'Sample Roll Request' . ($product ? " — {$product}" : '');
+    $mail->Body    = "Name: {$name}\r\nEmail: {$email}\r\n"
+                   . ($product ? "Product: {$product}\r\n" : '')
+                   . ($message ? "\r\nMessage:\r\n{$message}" : '');
+
+    $mail->send();
     echo json_encode(['ok' => true]);
-} else {
+} catch (Exception $e) {
     echo json_encode(['ok' => false, 'error' => 'Failed to send. Please email us directly.']);
 }

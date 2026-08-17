@@ -1,4 +1,6 @@
 inventory/config.php
+mail_config.php
+vendor/
 inventory/vendor/
 inventory/uploads/
 inventory/*.xlsx
