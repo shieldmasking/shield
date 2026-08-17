@@ -17,7 +17,7 @@ $body    = "Name: {$name}\r\nEmail: {$email}\r\n"
          . ($product ? "Product: {$product}\r\n" : '')
          . ($message ? "\r\nMessage:\r\n{$message}" : '');
 $headers = implode("\r\n", [
-    "From: noreply@shieldmasking.com",
+    "From: rstrenger@shieldmasking.com",
     "Reply-To: {$email}",
     "Content-Type: text/plain; charset=UTF-8",
 ]);
