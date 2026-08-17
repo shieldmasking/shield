@@ -36,6 +36,7 @@ try {
                    . ($product ? "Product: {$product}\r\n" : '')
                    . ($message ? "\r\nMessage:\r\n{$message}" : '');
 
+    $mail->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]];
     $mail->send();
     echo json_encode(['ok' => true]);
 } catch (Exception $e) {
