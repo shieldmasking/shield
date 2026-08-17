@@ -142,6 +142,24 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
+
+    /* CONTACT MODAL */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:500; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:var(--bg-2); border:1px solid var(--border); border-radius:4px; padding:2.5rem; max-width:480px; width:90%; position:relative; }
+    .modal-close { position:absolute; top:1rem; right:1.25rem; background:none; border:none; color:var(--muted); font-size:1.5rem; cursor:pointer; line-height:1; padding:0; }
+    .modal-close:hover { color:var(--white); }
+    .modal-title { font-size:1.25rem; font-weight:800; color:var(--white); margin-bottom:0.25rem; }
+    .modal-sub { font-size:0.875rem; color:var(--muted); margin-bottom:1.75rem; }
+    .cmodal-field { margin-bottom:1.25rem; }
+    .cmodal-field label { display:block; font-size:0.68rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--steel); margin-bottom:0.4rem; }
+    .cmodal-field input, .cmodal-field textarea { width:100%; background:var(--bg-3); border:1px solid var(--border); border-radius:3px; padding:0.625rem 0.875rem; color:var(--white); font-size:0.875rem; font-family:var(--font); box-sizing:border-box; }
+    .cmodal-field input:focus, .cmodal-field textarea:focus { outline:none; border-color:var(--accent); }
+    .cmodal-field textarea { resize:vertical; min-height:90px; }
+    .modal-submit { width:100%; padding:0.875rem; background:var(--navy); color:var(--white); border:none; border-radius:3px; font-weight:700; font-size:0.875rem; letter-spacing:0.07em; text-transform:uppercase; cursor:pointer; }
+    .modal-submit:hover { background:var(--navy-lt); }
+    .modal-submit:disabled { opacity:0.6; cursor:default; }
+    .modal-feedback { font-size:0.875rem; margin-top:1rem; text-align:center; }
   </style>
 </head>
 <body>
@@ -189,7 +207,7 @@
           <div class="spec"><span class="spec-k">Roll Length</span><span class="spec-v">36 yards</span></div>
           <div class="spec"><span class="spec-k">Availability</span><span class="spec-v stock-yes">In Stock</span></div>
         </div>
-        <a href="#contact" class="sample-link">Get a Sample Roll &rarr;</a>
+        <a href="#" class="sample-link js-contact-modal">Get a Sample Roll &rarr;</a>
       </div>
 
       <div class="product-card">
@@ -201,7 +219,7 @@
           <div class="spec"><span class="spec-k">Roll Length</span><span class="spec-v">36 yards</span></div>
           <div class="spec"><span class="spec-k">Availability</span><span class="spec-v stock-yes">In Stock</span></div>
         </div>
-        <a href="#contact" class="sample-link">Get a Sample Roll &rarr;</a>
+        <a href="#" class="sample-link js-contact-modal">Get a Sample Roll &rarr;</a>
       </div>
 
       <div class="product-card">
@@ -213,7 +231,7 @@
           <div class="spec"><span class="spec-k">Roll Length</span><span class="spec-v">18 yards</span></div>
           <div class="spec"><span class="spec-k">Availability</span><span class="spec-v stock-yes">In Stock</span></div>
         </div>
-        <a href="#contact" class="sample-link">Get a Sample Roll &rarr;</a>
+        <a href="#" class="sample-link js-contact-modal">Get a Sample Roll &rarr;</a>
       </div>
 
       <div class="product-card">
@@ -225,7 +243,7 @@
           <div class="spec"><span class="spec-k">Roll Length</span><span class="spec-v">18 yards</span></div>
           <div class="spec"><span class="spec-k">Availability</span><span class="spec-v stock-yes">In Stock</span></div>
         </div>
-        <a href="#contact" class="sample-link">Get a Sample Roll &rarr;</a>
+        <a href="#" class="sample-link js-contact-modal">Get a Sample Roll &rarr;</a>
       </div>
 
     </div>
@@ -243,7 +261,7 @@
           <div class="spec"><span class="spec-k">Temp Range</span><span class="spec-v">-73 to +260&deg;C</span></div>
           <div class="spec"><span class="spec-k">Availability</span><span class="spec-v stock-soon">In Production</span></div>
         </div>
-        <a href="#contact" class="sample-link">Get a Sample Roll &rarr;</a>
+        <a href="#" class="sample-link js-contact-modal">Get a Sample Roll &rarr;</a>
       </div>
 
       <div class="product-card">
@@ -256,7 +274,7 @@
           <div class="spec"><span class="spec-k">Temp Range</span><span class="spec-v">-73 to +260&deg;C</span></div>
           <div class="spec"><span class="spec-k">Availability</span><span class="spec-v stock-soon">In Production</span></div>
         </div>
-        <a href="#contact" class="sample-link">Get a Sample Roll &rarr;</a>
+        <a href="#" class="sample-link js-contact-modal">Get a Sample Roll &rarr;</a>
       </div>
 
     </div>
@@ -271,7 +289,7 @@
         <div class="specs">
           <div class="spec"><span class="spec-k">Availability</span><span class="spec-v stock-yes">In Stock</span></div>
         </div>
-        <a href="#contact" class="sample-link">Get a Sample Roll &rarr;</a>
+        <a href="#" class="sample-link js-contact-modal">Get a Sample Roll &rarr;</a>
       </div>
 
     </div>
@@ -328,5 +346,92 @@
   <p>&copy; 2025 Shield Masking Solutions. All rights reserved.</p>
 </footer>
 
+<!-- Contact Modal -->
+<div class="modal-overlay" id="contactModal">
+  <div class="modal-box">
+    <button class="modal-close" id="modalClose">&times;</button>
+    <div class="modal-title">Get a Sample Roll</div>
+    <p class="modal-sub">Send us your details and we'll get a sample out to you.</p>
+    <form id="contactForm">
+      <div class="cmodal-field">
+        <label>Name</label>
+        <input type="text" name="name" required placeholder="Your name">
+      </div>
+      <div class="cmodal-field">
+        <label>Email</label>
+        <input type="email" name="email" required placeholder="you@company.com">
+      </div>
+      <div class="cmodal-field">
+        <label>Product</label>
+        <input type="text" name="product" id="modalProduct" placeholder="e.g. 526N">
+      </div>
+      <div class="cmodal-field">
+        <label>Message <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+        <textarea name="message" placeholder="Any questions or requirements?"></textarea>
+      </div>
+      <button type="submit" class="modal-submit">Send Request</button>
+      <p class="modal-feedback" id="modalFeedback"></p>
+    </form>
+  </div>
+</div>
+
+<script>
+  var modal = document.getElementById('contactModal');
+
+  function openModal(product) {
+    document.getElementById('modalProduct').value = product || '';
+    document.getElementById('modalFeedback').textContent = '';
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+
+  document.querySelectorAll('.js-contact-modal').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      var num = this.closest('.product-card').querySelector('.product-num').textContent.trim();
+      openModal(num);
+    });
+  });
+
+  document.getElementById('contactForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = this.querySelector('.modal-submit');
+    var fb  = document.getElementById('modalFeedback');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    fb.textContent = '';
+
+    fetch('/contact.php', { method: 'POST', body: new FormData(this) })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          fb.style.color = '#4caf8b';
+          fb.textContent = "Request sent — we'll be in touch soon.";
+          document.getElementById('contactForm').reset();
+          btn.disabled = false;
+          btn.textContent = 'Send Request';
+        } else {
+          fb.style.color = '#f5a623';
+          fb.textContent = data.error || 'Something went wrong. Please try again.';
+          btn.disabled = false;
+          btn.textContent = 'Send Request';
+        }
+      })
+      .catch(function() {
+        fb.style.color = '#f5a623';
+        fb.textContent = 'Something went wrong. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Send Request';
+      });
+  });
+</script>
 </body>
 </html>
