@@ -16,9 +16,7 @@ $subject = 'Sample Roll Request' . ($product ? " — {$product}" : '');
 $body    = "Name: {$name}\r\nEmail: {$email}\r\n"
          . ($product ? "Product: {$product}\r\n" : '')
          . ($message ? "\r\nMessage:\r\n{$message}" : '');
-$headers = "From: rstrenger@shieldmasking.com\r\n"
-         . "Reply-To: {$email}\r\n"
-         . "X-Mailer: PHP/" . phpversion();
+$headers = "From: Shield Masking <rstrenger@shieldmasking.com>\r\nReply-To: {$email}";
 
 if (mail($to, $subject, $body, $headers)) {
     echo json_encode(['ok' => true]);
