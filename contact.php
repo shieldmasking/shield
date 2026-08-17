@@ -39,5 +39,5 @@ try {
     $mail->send();
     echo json_encode(['ok' => true]);
 } catch (Exception $e) {
-    echo json_encode(['ok' => false, 'error' => 'Failed to send. Please email us directly.']);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }
