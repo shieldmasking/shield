@@ -11,14 +11,35 @@ if (!$name || !$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
-$to      = 'rstrenger@shieldmasking.com';
-$subject = 'Sample Roll Request' . ($product ? " — {$product}" : '');
-$body    = "Name: {$name}\r\nEmail: {$email}\r\n"
-         . ($product ? "Product: {$product}\r\n" : '')
-         . ($message ? "\r\nMessage:\r\n{$message}" : '');
-$headers = "From: Shield Masking <rstrenger@shieldmasking.com>\r\nReply-To: {$email}";
+require_once __DIR__ . '/mail_config.php';
 
-if (mail($to, $subject, $body, $headers)) {
+$body = "Name: {$name}\r\nEmail: {$email}\r\n"
+      . ($product ? "Product: {$product}\r\n" : '')
+      . ($message ? "\r\nMessage:\r\n{$message}" : '');
+
+$payload = json_encode([
+    'from'     => 'Shield Masking <noreply@shieldmasking.com>',
+    'to'       => ['rstrenger@shieldmasking.com'],
+    'reply_to' => $email,
+    'subject'  => 'Sample Roll Request' . ($product ? " — {$product}" : ''),
+    'text'     => $body,
+]);
+
+$ch = curl_init('https://api.resend.com/emails');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST           => true,
+    CURLOPT_POSTFIELDS     => $payload,
+    CURLOPT_HTTPHEADER     => [
+        'Authorization: Bearer ' . RESEND_KEY,
+        'Content-Type: application/json',
+    ],
+]);
+$response = curl_exec($ch);
+$status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+if ($status === 200 || $status === 201) {
     echo json_encode(['ok' => true]);
 } else {
     echo json_encode(['ok' => false, 'error' => 'Failed to send. Please email us directly.']);
