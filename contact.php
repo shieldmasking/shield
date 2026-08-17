@@ -16,7 +16,7 @@ $subject = 'Sample Roll Request' . ($product ? " — {$product}" : '');
 $body    = "Name: {$name}\r\nEmail: {$email}\r\n"
          . ($product ? "Product: {$product}\r\n" : '')
          . ($message ? "\r\nMessage:\r\n{$message}" : '');
-$headers = "From: noreply@shieldmasking.com\r\n"
+$headers = "From: rstrenger@shieldmasking.com\r\n"
          . "Reply-To: {$email}\r\n"
          . "X-Mailer: PHP/" . phpversion();
 
