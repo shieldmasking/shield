@@ -20,12 +20,12 @@ use PHPMailer\PHPMailer\SMTP;
 $mail = new PHPMailer(true);
 try {
     $mail->isSMTP();
-    $mail->Host       = 'smtpout.secureserver.net';
+    $mail->Host       = 'smtp.office365.com';
     $mail->SMTPAuth   = true;
     $mail->Username   = MAIL_USER;
     $mail->Password   = MAIL_PASS;
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-    $mail->Port       = 465;
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port       = 587;
 
     $mail->setFrom(MAIL_USER, 'Shield Masking Website');
     $mail->addAddress('rstrenger@shieldmasking.com', 'Ryan Strenger');
