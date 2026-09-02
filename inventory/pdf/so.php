@@ -232,6 +232,9 @@ table.items tbody tr:last-child td { border-bottom: 1px solid #bbb; }
 
 </div>
 <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+<?php if (!empty($_GET['pdf'])): ?>
+<script>window.onload = function(){ window.print(); }</script>
+<?php endif; ?>
 <form method="post" style="position:fixed;bottom:24px;left:24px" onsubmit="return confirm('Delete this Sales Order? Inventory will be reversed.')">
     <input type="hidden" name="delete_so" value="<?= (int)$quote_id ?>">
     <button type="submit" style="padding:12px 24px;background:#dc3545;color:#fff;border:none;border-radius:4px;font-size:11pt;cursor:pointer">Delete SO</button>

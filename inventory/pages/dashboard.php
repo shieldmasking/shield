@@ -201,6 +201,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_id'], $_POST['s
     exit;
 }
 
+// ── Delete PO ─────────────────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_po_quote_id'])) {
+    $quote_id = (int)$_POST['delete_po_quote_id'];
+    $row = $db->prepare('SELECT po_pdf_path FROM quotes WHERE id = ?');
+    $row->execute([$quote_id]);
+    $po_path = $row->fetchColumn();
+    if ($po_path) {
+        $file = __DIR__ . '/../' . $po_path;
+        if (file_exists($file)) @unlink($file);
+        $db->prepare('UPDATE quotes SET po_pdf_path = NULL, po_discrepancies = NULL WHERE id = ?')->execute([$quote_id]);
+    }
+    header('Location: /inventory/pages/dashboard.php?' . http_build_query(array_filter([
+        'status' => $_POST['_filter_status'] ?? '',
+        'q'      => $_POST['_filter_q'] ?? '',
+    ])));
+    exit;
+}
+
+// ── Delete SO ─────────────────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_so_quote_id'])) {
+    $quote_id = (int)$_POST['delete_so_quote_id'];
+    $ord = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
+    $ord->execute([$quote_id]);
+    $order = $ord->fetch();
+    if ($order) {
+        $order_id = (int)$order['id'];
+        $items = $db->prepare('SELECT item_id, quantity FROM order_items WHERE order_id = ?');
+        $items->execute([$order_id]);
+        foreach ($items->fetchAll() as $oi) {
+            adjust_inventory($db, (int)$oi['item_id'], (float)$oi['quantity'],
+                'SO deleted', 'adjustment', null, current_user_id());
+        }
+        $db->prepare('DELETE FROM orders WHERE id = ?')->execute([$order_id]);
+        $db->prepare("UPDATE quotes SET status = 'sent' WHERE id = ?")->execute([$quote_id]);
+    }
+    header('Location: /inventory/pages/dashboard.php?' . http_build_query(array_filter([
+        'status' => $_POST['_filter_status'] ?? '',
+        'q'      => $_POST['_filter_q'] ?? '',
+    ])));
+    exit;
+}
+
 // ── Create SO for quote that has PO but no order ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_so_quote_id'])) {
     $quote_id = (int)$_POST['create_so_quote_id'];
@@ -383,7 +425,7 @@ render_header('Dashboard', 'dashboard');
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
             <thead><tr>
-                <th>Quote #</th><th>Customer</th><th>Status</th><th>Quote</th><th>PO</th><th>Sales Order</th><th>Total</th><th>Date</th><th></th>
+                <th>Quote #</th><th>Customer</th><th>Status</th><th>Quote</th><th>PO</th><th>Sales Order</th><th>Total</th><th>Date</th>
             </tr></thead>
             <tbody>
             <?php foreach ($quotes as $q):
@@ -391,6 +433,7 @@ render_header('Dashboard', 'dashboard');
                 $parse_error    = $disc && !empty($disc['parse_error']);
                 $has_disc       = $disc && empty($disc['parse_error']) && !empty($disc['discrepancies']);
                 $row_class      = ($parse_error || $has_disc) ? 'table-warning' : '';
+                $qid            = (int)$q['id'];
             ?>
             <tr class="<?= $row_class ?>">
                 <td class="fw-semibold">#<?= (int)$q['quote_number'] ?></td>
@@ -400,7 +443,7 @@ render_header('Dashboard', 'dashboard');
                 </td>
                 <td>
                     <select class="form-select form-select-sm" style="width:auto"
-                            onchange="setStatus(<?= (int)$q['id'] ?>, this.value)">
+                            onchange="setStatus(<?= $qid ?>, this.value)">
                         <?php foreach ($status_labels as $val => $label): ?>
                         <option value="<?= $val ?>" <?= $q['status'] === $val ? 'selected' : '' ?>><?= $label ?></option>
                         <?php endforeach; ?>
@@ -409,49 +452,60 @@ render_header('Dashboard', 'dashboard');
                     <span class="text-warning fw-semibold ms-1" title="PO could not be parsed — verify quantities manually">⚠ Verify quantities</span>
                     <?php elseif ($has_disc): ?>
                     <a href="#" class="text-warning fw-semibold ms-1 text-decoration-none"
-                       data-bs-toggle="modal" data-bs-target="#discModal<?= (int)$q['id'] ?>">⚠ Discrepancies</a>
+                       data-bs-toggle="modal" data-bs-target="#discModal<?= $qid ?>">⚠ Discrepancies</a>
                     <?php endif; ?>
                 </td>
-                <td>
-                    <a href="/inventory/pdf/quote.php?id=<?= (int)$q['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View Quote</a>
+
+                <!-- Quote -->
+                <td class="text-nowrap">
+                    <a href="/inventory/pages/quote-edit.php" class="btn btn-sm btn-outline-secondary">Create</a>
+                    <a href="/inventory/pages/quote-edit.php?id=<?= $qid ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <a href="/inventory/pdf/quote.php?id=<?= $qid ?>" target="_blank" class="btn btn-sm btn-outline-secondary">PDF</a>
                 </td>
-                <td>
+
+                <!-- PO -->
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="openAddPO(<?= $qid ?>)">Upload</button>
                     <?php if ($q['po_pdf_path']): ?>
-                    <a href="/inventory/<?= h($q['po_pdf_path']) ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View PO</a>
-                    <?php else: ?>
-                    <span class="text-muted">—</span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if ($q['order_id']): ?>
-                    <a href="/inventory/pdf/so.php?id=<?= (int)$q['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View SO</a>
-                    <?php elseif ($q['po_pdf_path']): ?>
-                    <form method="post" style="display:inline">
-                        <input type="hidden" name="create_so_quote_id" value="<?= (int)$q['id'] ?>">
+                    <a href="/inventory/<?= h($q['po_pdf_path']) ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View</a>
+                    <form method="post" style="display:inline" onsubmit="return confirm('Delete this PO?')">
+                        <input type="hidden" name="delete_po_quote_id" value="<?= $qid ?>">
                         <input type="hidden" name="_filter_status" value="<?= h($status) ?>">
                         <input type="hidden" name="_filter_q" value="<?= h($search) ?>">
-                        <button type="submit" class="btn btn-sm btn-primary">Create SO</button>
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                     </form>
-                    <?php else: ?>
-                    <span class="text-muted">—</span>
                     <?php endif; ?>
                 </td>
+
+                <!-- Sales Order -->
+                <td class="text-nowrap">
+                    <?php if (!$q['order_id'] && $q['po_pdf_path']): ?>
+                    <form method="post" style="display:inline">
+                        <input type="hidden" name="create_so_quote_id" value="<?= $qid ?>">
+                        <input type="hidden" name="_filter_status" value="<?= h($status) ?>">
+                        <input type="hidden" name="_filter_q" value="<?= h($search) ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Create</button>
+                    </form>
+                    <?php endif; ?>
+                    <?php if ($q['order_id']): ?>
+                    <a href="/inventory/pages/quote-edit.php?id=<?= $qid ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <form method="post" style="display:inline" onsubmit="return confirm('Delete this Sales Order? Inventory will be reversed.')">
+                        <input type="hidden" name="delete_so_quote_id" value="<?= $qid ?>">
+                        <input type="hidden" name="_filter_status" value="<?= h($status) ?>">
+                        <input type="hidden" name="_filter_q" value="<?= h($search) ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                    <a href="/inventory/pdf/so.php?id=<?= $qid ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View</a>
+                    <a href="/inventory/pdf/so.php?id=<?= $qid ?>&pdf=1" target="_blank" class="btn btn-sm btn-outline-secondary">PDF</a>
+                    <?php endif; ?>
+                </td>
+
                 <td><?= $q['total'] !== null ? currency((float)$q['total']) : '—' ?></td>
                 <td><?= date('M j, Y', strtotime($q['created_at'])) ?></td>
-                <td class="text-end text-nowrap">
-                    <a href="/inventory/pages/quote-edit.php?id=<?= (int)$q['id'] ?>" class="btn btn-sm btn-outline-secondary">
-                        <?= in_array($q['status'], ['draft','sent']) ? 'Edit' : 'View' ?>
-                    </a>
-                    <a href="/inventory/pdf/quote.php?id=<?= (int)$q['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">PDF</a>
-                    <button class="btn btn-sm btn-outline-primary"
-                            onclick="openAddPO(<?= (int)$q['id'] ?>)">
-                        <?= $q['po_pdf_path'] ? 'Replace PO' : 'Add PO' ?>
-                    </button>
-                </td>
             </tr>
             <?php endforeach; ?>
             <?php if (empty($quotes)): ?>
-            <tr><td colspan="9" class="text-muted text-center py-3">No quotes found.</td></tr>
+            <tr><td colspan="8" class="text-muted text-center py-3">No quotes found.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
