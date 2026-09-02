@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_po_quote_id'])) {
             $filename = 'uploads/po_' . $quote_id . '_' . time() . '.pdf';
             $dest     = __DIR__ . '/../' . $filename;
             if (!move_uploaded_file($_FILES['add_po_pdf']['tmp_name'], $dest)) {
-                $errors[] = 'Upload failed. dest=' . $dest . ' writable=' . (is_writable(dirname($dest)) ? 'yes' : 'no') . ' err=' . (error_get_last()['message'] ?? 'none');
+                $errors[] = 'Upload failed. Check uploads/ directory permissions.';
             } else {
                 $po_path = $filename;
             }
@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_from_po'])) {
             $filename = 'uploads/po_cust' . $customer_id . '_' . time() . '.pdf';
             $dest     = __DIR__ . '/../' . $filename;
             if (!move_uploaded_file($_FILES['po_pdf']['tmp_name'], $dest)) {
-                $errors[] = 'Upload failed. dest=' . $dest . ' writable=' . (is_writable(dirname($dest)) ? 'yes' : 'no') . ' err=' . (error_get_last()['message'] ?? 'none');
+                $errors[] = 'Upload failed. Check uploads/ directory permissions.';
             } else {
                 $po_path = $filename;
             }
