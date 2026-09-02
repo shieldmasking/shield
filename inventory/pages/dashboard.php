@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_po_quote_id'])) {
             $filename = 'uploads/po_' . $quote_id . '_' . time() . '.pdf';
             $dest     = __DIR__ . '/../' . $filename;
             if (!move_uploaded_file($_FILES['add_po_pdf']['tmp_name'], $dest)) {
-                $errors[] = 'Upload failed. Check uploads/ directory permissions.';
+                $errors[] = 'Upload failed. dest=' . $dest . ' writable=' . (is_writable(dirname($dest)) ? 'yes' : 'no') . ' err=' . (error_get_last()['message'] ?? 'none');
             } else {
                 $po_path = $filename;
             }
@@ -222,6 +222,13 @@ if ($search) {
     $params[] = "%{$search}%";
     $params[] = "%{$search}%";
     $params[] = "%{$search}%";
+}
+
+// Add po_discrepancies column if it doesn't exist yet
+try {
+    $db->query('SELECT po_discrepancies FROM quotes LIMIT 1');
+} catch (PDOException $e) {
+    $db->exec('ALTER TABLE quotes ADD COLUMN po_discrepancies TEXT NULL AFTER po_pdf_path');
 }
 
 $sql = 'SELECT q.id, q.quote_number, q.status, q.created_at, q.po_pdf_path, q.po_discrepancies,
