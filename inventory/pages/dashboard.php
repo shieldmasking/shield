@@ -201,6 +201,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_id'], $_POST['s
     exit;
 }
 
+// ── Create SO for quote that has PO but no order ──────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_so_quote_id'])) {
+    $quote_id = (int)$_POST['create_so_quote_id'];
+    $existing = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
+    $existing->execute([$quote_id]);
+    if (!$existing->fetch()) {
+        $notices = log_cut_recommendations($db, $quote_id);
+        if ($notices) $_SESSION['cut_notices'] = $notices;
+        create_order_from_quote($db, $quote_id, current_user_id());
+        $db->prepare("UPDATE quotes SET status = 'ordered' WHERE id = ?")->execute([$quote_id]);
+    }
+    header('Location: /inventory/pages/dashboard.php?' . http_build_query(array_filter([
+        'status' => $_POST['_filter_status'] ?? '',
+        'q'      => $_POST['_filter_q'] ?? '',
+    ])));
+    exit;
+}
+
 // ── Stats ─────────────────────────────────────────────────────────────────────
 $total_skus  = $db->query('SELECT COUNT(*) FROM items WHERE is_active = 1')->fetchColumn();
 $low_stock   = $db->query('SELECT COUNT(*) FROM items WHERE is_active = 1 AND reorder_threshold > 0 AND quantity_on_hand <= reorder_threshold')->fetchColumn();
@@ -233,9 +251,11 @@ try {
 
 $sql = 'SELECT q.id, q.quote_number, q.status, q.created_at, q.po_pdf_path, q.po_discrepancies,
                c.name AS customer_name, c.company,
-               (SELECT SUM(qi.quantity * qi.unit_price) FROM quote_items qi WHERE qi.quote_id = q.id) AS total
+               (SELECT SUM(qi.quantity * qi.unit_price) FROM quote_items qi WHERE qi.quote_id = q.id) AS total,
+               o.id AS order_id
         FROM quotes q
         JOIN customers c ON c.id = q.customer_id
+        LEFT JOIN orders o ON o.quote_id = q.id
         WHERE ' . implode(' AND ', $where) . '
         ORDER BY q.created_at DESC';
 
@@ -366,7 +386,7 @@ render_header('Dashboard', 'dashboard');
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
             <thead><tr>
-                <th>Quote #</th><th>Customer</th><th>Status</th><th>PO</th><th>Total</th><th>Date</th><th></th>
+                <th>Quote #</th><th>Customer</th><th>Status</th><th>PO</th><th>Sales Order</th><th>Total</th><th>Date</th><th></th>
             </tr></thead>
             <tbody>
             <?php foreach ($quotes as $q):
@@ -402,6 +422,20 @@ render_header('Dashboard', 'dashboard');
                     <span class="text-muted">—</span>
                     <?php endif; ?>
                 </td>
+                <td>
+                    <?php if ($q['order_id']): ?>
+                    <a href="/inventory/pdf/so.php?id=<?= (int)$q['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View SO</a>
+                    <?php elseif ($q['po_pdf_path']): ?>
+                    <form method="post" style="display:inline">
+                        <input type="hidden" name="create_so_quote_id" value="<?= (int)$q['id'] ?>">
+                        <input type="hidden" name="_filter_status" value="<?= h($status) ?>">
+                        <input type="hidden" name="_filter_q" value="<?= h($search) ?>">
+                        <button type="submit" class="btn btn-sm btn-primary">Create SO</button>
+                    </form>
+                    <?php else: ?>
+                    <span class="text-muted">—</span>
+                    <?php endif; ?>
+                </td>
                 <td><?= $q['total'] !== null ? currency((float)$q['total']) : '—' ?></td>
                 <td><?= date('M j, Y', strtotime($q['created_at'])) ?></td>
                 <td class="text-end text-nowrap">
@@ -417,7 +451,7 @@ render_header('Dashboard', 'dashboard');
             </tr>
             <?php endforeach; ?>
             <?php if (empty($quotes)): ?>
-            <tr><td colspan="7" class="text-muted text-center py-3">No quotes found.</td></tr>
+            <tr><td colspan="8" class="text-muted text-center py-3">No quotes found.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
