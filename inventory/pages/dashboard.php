@@ -201,30 +201,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quote_id'], $_POST['s
     exit;
 }
 
-// ── Delete SO ─────────────────────────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_so_quote_id'])) {
-    $quote_id = (int)$_POST['delete_so_quote_id'];
-    $ord = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
-    $ord->execute([$quote_id]);
-    $order = $ord->fetch();
-    if ($order) {
-        $order_id = (int)$order['id'];
-        $items = $db->prepare('SELECT item_id, quantity FROM order_items WHERE order_id = ?');
-        $items->execute([$order_id]);
-        foreach ($items->fetchAll() as $oi) {
-            adjust_inventory($db, (int)$oi['item_id'], (float)$oi['quantity'],
-                'SO deleted', 'adjustment', null, current_user_id());
-        }
-        $db->prepare('DELETE FROM orders WHERE id = ?')->execute([$order_id]);
-        $db->prepare("UPDATE quotes SET status = 'sent' WHERE id = ?")->execute([$quote_id]);
-    }
-    header('Location: /inventory/pages/dashboard.php?' . http_build_query(array_filter([
-        'status' => $_POST['_filter_status'] ?? '',
-        'q'      => $_POST['_filter_q'] ?? '',
-    ])));
-    exit;
-}
-
 // ── Create SO for quote that has PO but no order ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_so_quote_id'])) {
     $quote_id = (int)$_POST['create_so_quote_id'];
@@ -449,12 +425,6 @@ render_header('Dashboard', 'dashboard');
                 <td>
                     <?php if ($q['order_id']): ?>
                     <a href="/inventory/pdf/so.php?id=<?= (int)$q['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View SO</a>
-                    <form method="post" style="display:inline" onsubmit="return confirm('Delete this Sales Order? Inventory will be reversed.')">
-                        <input type="hidden" name="delete_so_quote_id" value="<?= (int)$q['id'] ?>">
-                        <input type="hidden" name="_filter_status" value="<?= h($status) ?>">
-                        <input type="hidden" name="_filter_q" value="<?= h($search) ?>">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete SO</button>
-                    </form>
                     <?php elseif ($q['po_pdf_path']): ?>
                     <form method="post" style="display:inline">
                         <input type="hidden" name="create_so_quote_id" value="<?= (int)$q['id'] ?>">

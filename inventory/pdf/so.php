@@ -9,6 +9,26 @@ require_login();
 $db       = db();
 $quote_id = (int)($_GET['id'] ?? 0);
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_so'])) {
+    $qid = (int)$_POST['delete_so'];
+    $ord = $db->prepare('SELECT id FROM orders WHERE quote_id = ?');
+    $ord->execute([$qid]);
+    $order = $ord->fetch();
+    if ($order) {
+        $order_id = (int)$order['id'];
+        $items = $db->prepare('SELECT item_id, quantity FROM order_items WHERE order_id = ?');
+        $items->execute([$order_id]);
+        foreach ($items->fetchAll() as $oi) {
+            adjust_inventory($db, (int)$oi['item_id'], (float)$oi['quantity'],
+                'SO deleted', 'adjustment', null, current_user_id());
+        }
+        $db->prepare('DELETE FROM orders WHERE id = ?')->execute([$order_id]);
+        $db->prepare("UPDATE quotes SET status = 'sent' WHERE id = ?")->execute([$qid]);
+    }
+    header('Location: /inventory/pages/dashboard.php');
+    exit;
+}
+
 $stmt = $db->prepare('
     SELECT q.*, c.name AS customer_name, c.company, c.email, c.phone, c.billing_address, c.terms,
            u.name AS rep_name,
@@ -212,5 +232,9 @@ table.items tbody tr:last-child td { border-bottom: 1px solid #bbb; }
 
 </div>
 <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+<form method="post" style="position:fixed;bottom:24px;left:24px" onsubmit="return confirm('Delete this Sales Order? Inventory will be reversed.')">
+    <input type="hidden" name="delete_so" value="<?= (int)$quote_id ?>">
+    <button type="submit" style="padding:12px 24px;background:#dc3545;color:#fff;border:none;border-radius:4px;font-size:11pt;cursor:pointer">Delete SO</button>
+</form>
 </body>
 </html>
