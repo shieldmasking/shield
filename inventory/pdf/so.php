@@ -23,17 +23,42 @@ $stmt->execute([$quote_id]);
 $quote = $stmt->fetch();
 if (!$quote) { header('Location: /inventory/pages/dashboard.php'); exit; }
 
-$items_stmt = $db->prepare('
-    SELECT qi.quantity, qi.unit_price, i.sku, i.width_inches,
-           p.name AS item_name, p.roll_length_yards, p.description, p.is_log, p.is_fixed_width
-    FROM quote_items qi
-    JOIN items i ON i.id = qi.item_id
-    JOIN products p ON p.base_sku = i.base_sku
-    WHERE qi.quote_id = ?
-    ORDER BY qi.id
-');
-$items_stmt->execute([$quote_id]);
-$line_items = $items_stmt->fetchAll();
+// Try to build line items from PO data; fall back to quote_items
+$line_items = [];
+if ($quote['po_pdf_path']) {
+    $po_file = __DIR__ . '/../' . $quote['po_pdf_path'];
+    $parsed  = file_exists($po_file) ? parse_po_pdf($po_file, $db) : ['parse_error' => true, 'items' => []];
+    if (!$parsed['parse_error'] && !empty($parsed['items'])) {
+        $detail = $db->prepare('
+            SELECT i.id, i.sku, i.width_inches,
+                   p.name AS item_name, p.roll_length_yards, p.description, p.is_log, p.is_fixed_width
+            FROM items i JOIN products p ON p.base_sku = i.base_sku
+            WHERE i.id = ?
+        ');
+        foreach ($parsed['items'] as $pi) {
+            if (!$pi['qty']) continue;
+            $detail->execute([$pi['item_id']]);
+            $row = $detail->fetch();
+            if (!$row) continue;
+            $row['quantity']   = $pi['qty'];
+            $row['unit_price'] = $pi['price'] ?? 0;
+            $line_items[]      = $row;
+        }
+    }
+}
+if (empty($line_items)) {
+    $items_stmt = $db->prepare('
+        SELECT qi.quantity, qi.unit_price, i.sku, i.width_inches,
+               p.name AS item_name, p.roll_length_yards, p.description, p.is_log, p.is_fixed_width
+        FROM quote_items qi
+        JOIN items i ON i.id = qi.item_id
+        JOIN products p ON p.base_sku = i.base_sku
+        WHERE qi.quote_id = ?
+        ORDER BY qi.id
+    ');
+    $items_stmt->execute([$quote_id]);
+    $line_items = $items_stmt->fetchAll();
+}
 
 $total = array_sum(array_map(fn($r) => $r['quantity'] * $r['unit_price'], $line_items));
 
