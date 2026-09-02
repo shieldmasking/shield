@@ -212,10 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_so_quote_id'])
         create_order_from_quote($db, $quote_id, current_user_id());
         $db->prepare("UPDATE quotes SET status = 'ordered' WHERE id = ?")->execute([$quote_id]);
     }
-    header('Location: /inventory/pages/dashboard.php?' . http_build_query(array_filter([
-        'status' => $_POST['_filter_status'] ?? '',
-        'q'      => $_POST['_filter_q'] ?? '',
-    ])));
+    header('Location: /inventory/pdf/so.php?id=' . $quote_id);
     exit;
 }
 
