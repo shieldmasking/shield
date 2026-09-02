@@ -383,7 +383,7 @@ render_header('Dashboard', 'dashboard');
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
             <thead><tr>
-                <th>Quote #</th><th>Customer</th><th>Status</th><th>PO</th><th>Sales Order</th><th>Total</th><th>Date</th><th></th>
+                <th>Quote #</th><th>Customer</th><th>Status</th><th>Quote</th><th>PO</th><th>Sales Order</th><th>Total</th><th>Date</th><th></th>
             </tr></thead>
             <tbody>
             <?php foreach ($quotes as $q):
@@ -411,6 +411,9 @@ render_header('Dashboard', 'dashboard');
                     <a href="#" class="text-warning fw-semibold ms-1 text-decoration-none"
                        data-bs-toggle="modal" data-bs-target="#discModal<?= (int)$q['id'] ?>">⚠ Discrepancies</a>
                     <?php endif; ?>
+                </td>
+                <td>
+                    <a href="/inventory/pdf/quote.php?id=<?= (int)$q['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">View Quote</a>
                 </td>
                 <td>
                     <?php if ($q['po_pdf_path']): ?>
@@ -448,7 +451,7 @@ render_header('Dashboard', 'dashboard');
             </tr>
             <?php endforeach; ?>
             <?php if (empty($quotes)): ?>
-            <tr><td colspan="8" class="text-muted text-center py-3">No quotes found.</td></tr>
+            <tr><td colspan="9" class="text-muted text-center py-3">No quotes found.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
