@@ -91,10 +91,10 @@ CREATE TABLE items (
 
 -- Seed: products
 INSERT INTO products (base_sku, name, category_id, coo, factory_product_num, thickness_mm, roll_length_yards, is_log, is_fixed_width, land_cost_base, markup_multiplier) VALUES
-('730D',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)', 3,'TW','P730W-5-2L',0.600,18,0,0,19.4200,2.2000),
+('730D',  'Glass Cloth Tape - 2 Layer w/Liner (Heavy)', 3,'TW','P730W-5-2L',0.600,18,0,0,21.4900,2.2000),
 ('730L',  'Glass Cloth Tape w/Liner',                  2,'TW','P700V-1',    0.190,36,0,0,14.0300,2.1100),
-('730S',  'Glass Cloth Tape w/Liner (Heavy)',           2,'TW','P730W-5',    0.300,36,0,0,15.8900,2.1900),
-('730SL', 'Glass Cloth Tape - 2 Layer w/Liner',        3,'TW','P730M-2',    0.490,18,0,0,17.3300,2.2200),
+('730S',  'Glass Cloth Tape w/Liner (Heavy)',           2,'TW','P730W-5',    0.300,36,0,0,21.4200,2.1900),
+('730SL', 'Glass Cloth Tape - 2 Layer w/Liner',        3,'TW','P730M-2',    0.490,18,0,0,21.0100,2.2200),
 ('520N',  'Glass Cloth Tape - No Liner',                1,'CN','XBQ-3120',   0.200,36,0,0, 9.9800,2.1900),
 ('526N',  'Glass Cloth Tape - No Liner (Heavy)',        1,'CN','XBQ-3123',   0.260,36,0,0,11.8600,2.1900),
 ('962S',  'Aluminum/Glass Cloth Tape - No Liner',       4,'CN','XBQ-028',    0.280,36,0,0,11.8500,2.1900),
