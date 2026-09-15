@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['cost_sheet'])) {
 $products = $db->query(
     'SELECT p.*, c.name AS cat_name
      FROM products p JOIN categories c ON c.id = p.category_id
-     ORDER BY c.name, p.base_sku'
+     ORDER BY p.base_sku'
 )->fetchAll();
 
 render_header('Admin — Bulk Pricing', 'admin');
