@@ -174,7 +174,7 @@ render_header('Admin — Bulk Pricing', 'admin');
 <form method="post">
 <table class="table table-bordered table-sm align-middle mb-0">
 <thead class="table-light">
-<tr><th>SKU</th><th>Product</th><th>Category</th><th>1&quot; Land Cost ($)</th><th>Markup</th><th>Sell (1&quot;)</th></tr>
+<tr><th>SKU</th><th>Product</th><th>Category</th><th>1&quot; Land Cost ($)</th><th>Markup</th><th>Sell (1&quot;)</th><th></th></tr>
 </thead>
 <tbody>
 <?php foreach ($products as $p):
@@ -197,6 +197,7 @@ render_header('Admin — Bulk Pricing', 'admin');
                step="0.0001" min="1" required data-sku="<?= h($p['base_sku']) ?>">
     </td>
     <td class="sell-preview" id="sell-<?= h($p['base_sku']) ?>"><?= currency($sell) ?></td>
+    <td><button type="button" class="btn btn-sm btn-outline-secondary cancel-row" style="display:none">Cancel</button></td>
 </tr>
 <?php endforeach; ?>
 </tbody>
@@ -209,18 +210,27 @@ render_header('Admin — Bulk Pricing', 'admin');
 </div>
 
 <script>
+function updateRow(row) {
+    var sku    = row.querySelector('.land-cost').dataset.sku;
+    var land   = parseFloat(row.querySelector('.land-cost').value) || 0;
+    var markup = parseFloat(row.querySelector('.markup').value)    || 0;
+    document.getElementById('sell-' + sku).textContent = '$' + (land * markup).toFixed(2);
+    var dirty = Array.from(row.querySelectorAll('.land-cost, .markup'))
+        .some(function(i) { return parseFloat(i.value) !== parseFloat(i.dataset.original); });
+    row.classList.toggle('table-warning', dirty);
+    row.querySelector('.cancel-row').style.display = dirty ? '' : 'none';
+}
+
 document.querySelectorAll('.land-cost, .markup').forEach(function(el) {
     el.dataset.original = el.value;
-    el.addEventListener('input', function() {
-        var sku    = this.dataset.sku;
-        var row    = this.closest('tr');
-        var land   = parseFloat(row.querySelector('.land-cost').value) || 0;
-        var markup = parseFloat(row.querySelector('.markup').value)    || 0;
-        document.getElementById('sell-' + sku).textContent = '$' + (land * markup).toFixed(2);
-        // Highlight row if any field differs from original
-        var dirty = Array.from(row.querySelectorAll('.land-cost, .markup'))
-            .some(function(i) { return parseFloat(i.value) !== parseFloat(i.dataset.original); });
-        row.classList.toggle('table-warning', dirty);
+    el.addEventListener('input', function() { updateRow(this.closest('tr')); });
+});
+
+document.querySelectorAll('.cancel-row').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var row = this.closest('tr');
+        row.querySelectorAll('.land-cost, .markup').forEach(function(i) { i.value = i.dataset.original; });
+        updateRow(row);
     });
 });
 </script>
