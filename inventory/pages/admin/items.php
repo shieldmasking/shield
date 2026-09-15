@@ -46,12 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = "Pricing updated for {$base_sku}.";
 
     } elseif (isset($_POST['save_row'])) {
-        $id        = (int)$_POST['id'];
-        $reorder   = (int)$_POST['reorder_threshold'];
-        $is_active = isset($_POST['is_active']) ? 1 : 0;
+        $id             = (int)$_POST['id'];
+        $reorder        = (int)$_POST['reorder_threshold'];
+        $is_active      = isset($_POST['is_active']) ? 1 : 0;
+        $price_override = $_POST['price_override'] !== '' ? (float)$_POST['price_override'] : null;
 
-        $db->prepare('UPDATE items SET reorder_threshold=?, is_active=? WHERE id=?')
-           ->execute([$reorder, $is_active, $id]);
+        $db->prepare('UPDATE items SET reorder_threshold=?, is_active=?, price_override=? WHERE id=?')
+           ->execute([$reorder, $is_active, $price_override, $id]);
         $msg = 'Item updated.';
 
     } elseif (isset($_POST['add_base'])) {
@@ -151,12 +152,14 @@ render_header('Admin — Products', 'admin');
 <?php foreach ($rows as $item):
     // Merge product fields for pricing calculation
     $merged = array_merge($prod, $item);
-    $sell_raw = $prod['is_log']
-        ? round($prod['land_cost_base'] * $item['width_inches'] * $prod['markup_multiplier'], 2)
-        : ($prod['is_fixed_width']
-            ? round($prod['land_cost_base'] * $prod['markup_multiplier'], 2)
-            : calculate_sell_price($merged, $wm));
-    $sell = currency($sell_raw);
+    $sell_raw = $item['price_override'] !== null
+        ? (float)$item['price_override']
+        : ($prod['is_log']
+            ? round($prod['land_cost_base'] * $item['width_inches'] * $prod['markup_multiplier'], 2)
+            : ($prod['is_fixed_width']
+                ? round($prod['land_cost_base'] * $prod['markup_multiplier'], 2)
+                : calculate_sell_price($merged, $wm)));
+    $sell = currency($sell_raw) . ($item['price_override'] !== null ? ' <span class="badge bg-warning text-dark">manual</span>' : '');
     $vol  = currency(round($sell_raw * 0.70, 2));
     $disc = $prod['is_log']
         ? currency(round($prod['land_cost_base'] * $item['width_inches'] * 1.9, 2))
@@ -177,10 +180,11 @@ render_header('Admin — Products', 'admin');
     <td>
         <button class="btn btn-sm btn-outline-secondary"
             onclick="openRowEdit(<?= htmlspecialchars(json_encode([
-                'id'                => $item['id'],
-                'sku'               => $item['sku'],
+                'id'             => $item['id'],
+                'sku'            => $item['sku'],
                 'reorder_threshold' => $item['reorder_threshold'],
-                'is_active'         => $item['is_active'],
+                'is_active'      => $item['is_active'],
+                'price_override' => $item['price_override'],
             ]), ENT_QUOTES) ?>)"
             data-bs-toggle="modal" data-bs-target="#editRowModal">Edit</button>
     </td>
@@ -250,6 +254,11 @@ render_header('Admin — Products', 'admin');
 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
     <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">Roll Price Override ($)</label>
+            <input type="number" name="price_override" id="editRowPriceOverride" class="form-control" step="0.01" min="0" placeholder="Leave blank to use calculated price">
+            <div class="form-text">Overrides the calculated price for this width only.</div>
+        </div>
         <div class="col-md-6">
             <label class="form-label">Reorder Threshold (rolls)</label>
             <input type="number" name="reorder_threshold" id="editRowReorder" class="form-control" min="0" value="0">
@@ -335,10 +344,11 @@ function openBaseEdit(data) {
     document.getElementById('editBaseMarkup').value         = data.markup_multiplier;
 }
 function openRowEdit(data) {
-    document.getElementById('editRowId').value        = data.id;
-    document.getElementById('editRowSku').textContent = data.sku;
-    document.getElementById('editRowReorder').value   = data.reorder_threshold;
-    document.getElementById('editRowActive').checked  = data.is_active == 1;
+    document.getElementById('editRowId').value              = data.id;
+    document.getElementById('editRowSku').textContent       = data.sku;
+    document.getElementById('editRowPriceOverride').value   = data.price_override ?? '';
+    document.getElementById('editRowReorder').value         = data.reorder_threshold;
+    document.getElementById('editRowActive').checked        = data.is_active == 1;
 }
 function toggleFixedWidth(cb) {
     document.getElementById('fixedWidthField').style.display = cb.checked ? '' : 'none';

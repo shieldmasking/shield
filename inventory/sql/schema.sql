@@ -83,6 +83,7 @@ CREATE TABLE items (
     width_inches        DECIMAL(8,4)  NOT NULL COMMENT 'Slit width or full log width',
     quantity_on_hand    DECIMAL(10,2) NOT NULL DEFAULT 0,
     reorder_threshold   DECIMAL(10,2) NOT NULL DEFAULT 0,
+    price_override      DECIMAL(10,2) NULL     DEFAULT NULL COMMENT 'Manual roll price override; NULL = use calculated price',
     is_active           TINYINT(1)    NOT NULL DEFAULT 1,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_base_width (base_sku, width_inches),
