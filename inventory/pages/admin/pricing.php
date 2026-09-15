@@ -13,19 +13,22 @@ $parse_error = '';
 
 // ── Parse PDF helper ───────────────────────────────────────────────────────────
 function parse_cost_sheet(string $text): array {
-    // Each product line: SKU  COO  FACTORY#  THICK  SIZE_IN  SIZE_METRIC  MOQ  SQ/M  LOG  ROLL  LAND  SELL  GP%
-    // The LAND cost is always the 11th token (index 10).
-    // SKUs can be: 520N, 526N, 730L, 730S, 730SL, 730D, 928S, 962S, 1000X, etc.
+    // Line format: SKU  COO  FACTORY#  THICK  SIZE_IN  SIZE_METRIC  MOQ  SQ/M  LOG  ROLL  LAND  NET  GP%
+    // token[10] = LAND 1" cost, token[11] = NET sell price
     $results = [];
     foreach (explode("\n", $text) as $line) {
         $line = trim($line);
         if (!preg_match('/^([A-Z0-9]+)\s+[A-Z]{2}\s+\S+\s+[\d.]+mm/', $line, $m)) continue;
         $tokens = preg_split('/\s+/', $line);
-        if (count($tokens) < 11) continue;
+        if (count($tokens) < 12) continue;
         $sku  = $tokens[0];
         $land = (float)$tokens[10];
-        if ($land <= 0) continue;
-        $results[$sku] = $land;
+        $net  = (float)$tokens[11];
+        if ($land <= 0 || $net <= 0) continue;
+        $results[$sku] = [
+            'land'   => $land,
+            'markup' => round($net / $land, 4),
+        ];
     }
     return $results;
 }
@@ -37,12 +40,13 @@ $sku_alias = [
 
 // ── POST: apply confirmed prices ───────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_prices'])) {
-    $stmt = $db->prepare('UPDATE products SET land_cost_base=? WHERE base_sku=?');
+    $stmt = $db->prepare('UPDATE products SET land_cost_base=?, markup_multiplier=? WHERE base_sku=?');
     foreach ($_POST['land_cost'] as $base_sku => $land) {
-        $land = (float)$land;
-        if ($land > 0) $stmt->execute([$land, $base_sku]);
+        $land   = (float)$land;
+        $markup = (float)($_POST['markup'][$base_sku] ?? 0);
+        if ($land > 0 && $markup > 0) $stmt->execute([$land, $markup, $base_sku]);
     }
-    $msg = 'Land costs updated successfully.';
+    $msg = 'Prices updated successfully.';
 }
 
 // ── POST: upload + parse PDF ───────────────────────────────────────────────────
@@ -59,16 +63,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['cost_sheet'])) {
         } else {
             $raw = parse_cost_sheet($text);
             // Load current products for comparison
-            $products = $db->query('SELECT base_sku, land_cost_base FROM products')->fetchAll(PDO::FETCH_KEY_PAIR);
-            foreach ($raw as $pdf_sku => $land) {
+            $products = $db->query('SELECT base_sku, land_cost_base, markup_multiplier FROM products')->fetchAll(PDO::FETCH_UNIQUE);
+            foreach ($raw as $pdf_sku => $vals) {
                 $db_sku = $sku_alias[$pdf_sku] ?? $pdf_sku;
                 if (!array_key_exists($db_sku, $products)) continue;
                 $parsed[] = [
-                    'pdf_sku'  => $pdf_sku,
-                    'base_sku' => $db_sku,
-                    'current'  => (float)$products[$db_sku],
-                    'new'      => $land,
-                    'changed'  => abs($land - (float)$products[$db_sku]) > 0.0001,
+                    'pdf_sku'        => $pdf_sku,
+                    'base_sku'       => $db_sku,
+                    'cur_land'       => (float)$products[$db_sku]['land_cost_base'],
+                    'cur_markup'     => (float)$products[$db_sku]['markup_multiplier'],
+                    'new_land'       => $vals['land'],
+                    'new_markup'     => $vals['markup'],
+                    'land_changed'   => abs($vals['land']   - (float)$products[$db_sku]['land_cost_base'])       > 0.0001,
+                    'markup_changed' => abs($vals['markup'] - (float)$products[$db_sku]['markup_multiplier']) > 0.0001,
                 ];
             }
             if (empty($parsed)) {
@@ -122,42 +129,32 @@ render_header('Admin — Bulk Pricing', 'admin');
 <form method="post">
 <table class="table table-sm mb-0 align-middle">
 <thead class="table-light">
-<tr><th>SKU</th><th>Current Land Cost</th><th>New Land Cost</th><th>Change</th><th class="text-center">Apply?</th></tr>
+<tr><th>SKU</th><th>Land Cost</th><th>New Land</th><th>Markup</th><th>New Markup</th><th>New Sell (1")</th></tr>
 </thead>
 <tbody>
-<?php foreach ($parsed as $row): ?>
-<tr class="<?= $row['changed'] ? 'table-warning' : '' ?>">
+<?php foreach ($parsed as $row):
+    $changed = $row['land_changed'] || $row['markup_changed'];
+?>
+<tr class="<?= $changed ? 'table-warning' : '' ?>">
     <td class="fw-semibold">
         <?= h($row['base_sku']) ?>
         <?php if ($row['pdf_sku'] !== $row['base_sku']): ?>
         <span class="text-muted small">(PDF: <?= h($row['pdf_sku']) ?>)</span>
         <?php endif; ?>
     </td>
-    <td><?= currency($row['current']) ?></td>
+    <td class="text-muted"><?= currency($row['cur_land']) ?></td>
     <td>
         <input type="number" name="land_cost[<?= h($row['base_sku']) ?>]"
-               value="<?= number_format($row['new'], 4) ?>"
-               class="form-control form-control-sm" style="width:110px"
-               step="0.0001" min="0">
+               value="<?= number_format($row['new_land'], 4) ?>"
+               class="form-control form-control-sm" style="width:110px" step="0.0001" min="0">
     </td>
+    <td class="text-muted"><?= number_format($row['cur_markup'], 4) ?></td>
     <td>
-        <?php if ($row['changed']): ?>
-            <?php $diff = $row['new'] - $row['current']; ?>
-            <span class="text-<?= $diff > 0 ? 'danger' : 'success' ?>">
-                <?= ($diff > 0 ? '+' : '') . number_format($diff, 4) ?>
-            </span>
-        <?php else: ?>
-            <span class="text-muted">no change</span>
-        <?php endif; ?>
+        <input type="number" name="markup[<?= h($row['base_sku']) ?>]"
+               value="<?= number_format($row['new_markup'], 4) ?>"
+               class="form-control form-control-sm" style="width:100px" step="0.0001" min="0">
     </td>
-    <td class="text-center">
-        <input type="checkbox" name="land_cost[<?= h($row['base_sku']) ?>]"
-               class="form-check-input" style="display:none">
-        <?php if ($row['changed']): ?>
-        <!-- land_cost array key already set above via number input; checkbox not needed -->
-        <?php endif; ?>
-        <?= $row['changed'] ? '<span class="badge bg-warning text-dark">pending</span>' : '<span class="badge bg-secondary">same</span>' ?>
-    </td>
+    <td><?= currency(round($row['new_land'] * $row['new_markup'], 2)) ?></td>
 </tr>
 <?php endforeach; ?>
 </tbody>
