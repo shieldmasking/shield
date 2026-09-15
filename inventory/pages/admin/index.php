@@ -9,6 +9,7 @@ render_header('Admin', 'admin');
 <h4>Admin</h4>
 <div class="list-group mt-3" style="max-width:400px">
     <a href="/inventory/pages/admin/items.php" class="list-group-item list-group-item-action">Products / SKUs</a>
+    <a href="/inventory/pages/admin/pricing.php" class="list-group-item list-group-item-action">Bulk Pricing Update</a>
     <a href="/inventory/pages/admin/width-multipliers.php" class="list-group-item list-group-item-action">Width Multipliers</a>
     <?php if (is_admin()): ?><a href="/inventory/pages/admin/users.php" class="list-group-item list-group-item-action">Users</a><?php endif; ?>
     <a href="/inventory/pages/admin/settings.php" class="list-group-item list-group-item-action">Settings</a>
