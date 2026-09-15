@@ -210,12 +210,17 @@ render_header('Admin — Bulk Pricing', 'admin');
 
 <script>
 document.querySelectorAll('.land-cost, .markup').forEach(function(el) {
+    el.dataset.original = el.value;
     el.addEventListener('input', function() {
         var sku    = this.dataset.sku;
         var row    = this.closest('tr');
         var land   = parseFloat(row.querySelector('.land-cost').value) || 0;
         var markup = parseFloat(row.querySelector('.markup').value)    || 0;
         document.getElementById('sell-' + sku).textContent = '$' + (land * markup).toFixed(2);
+        // Highlight row if any field differs from original
+        var dirty = Array.from(row.querySelectorAll('.land-cost, .markup'))
+            .some(function(i) { return parseFloat(i.value) !== parseFloat(i.dataset.original); });
+        row.classList.toggle('table-warning', dirty);
     });
 });
 </script>
