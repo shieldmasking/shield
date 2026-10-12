@@ -200,7 +200,8 @@ foreach ($base_skus_raw as $b) {
 }
 
 $wm             = get_width_multipliers($db);
-$standard_widths = standard_widths(); // 0.125 to 6.0 in 0.125" steps
+$standard_widths = array_values(array_unique(array_merge(standard_widths(), array_map('floatval', array_keys($wm)))));
+sort($standard_widths);
 
 $total = array_sum(array_map(fn($r) => $r['quantity'] * $r['unit_price'], $quote_items));
 
