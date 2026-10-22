@@ -446,8 +446,15 @@
 
 <script>
   var modal = document.getElementById('contactModal');
+  var modalBox = document.querySelector('.modal-box');
+  var originalModalHTML = modalBox.innerHTML;
 
   function openModal(product) {
+    if (!document.getElementById('contactForm')) {
+      modalBox.innerHTML = originalModalHTML;
+      document.getElementById('modalClose').addEventListener('click', closeModal);
+      bindForm();
+    }
     document.getElementById('modalProduct').value = product || '';
     document.getElementById('modalFeedback').textContent = '';
     modal.classList.add('open');
@@ -471,37 +478,42 @@
     });
   });
 
-  document.getElementById('contactForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var btn = this.querySelector('.modal-submit');
-    var fb  = document.getElementById('modalFeedback');
-    btn.disabled = true;
-    btn.textContent = 'Sending...';
-    fb.textContent = '';
+  function bindForm() {
+    document.getElementById('contactForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var btn = this.querySelector('.modal-submit');
+      var fb  = document.getElementById('modalFeedback');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      fb.textContent = '';
 
-    fetch('/contact.php', { method: 'POST', body: new FormData(this) })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.ok) {
-          fb.style.color = '#4caf8b';
-          fb.textContent = "Request sent — we'll be in touch soon.";
-          document.getElementById('contactForm').reset();
-          btn.disabled = false;
-          btn.textContent = 'Send Request';
-        } else {
+      fetch('/contact.php', { method: 'POST', body: new FormData(this) })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.ok) {
+            modalBox.innerHTML = '<div style="text-align:center;padding:1rem 0">'
+              + '<div style="font-size:2.5rem;margin-bottom:1rem">&#10003;</div>'
+              + '<div class="modal-title" style="margin-bottom:0.75rem">Request Received!</div>'
+              + '<p style="color:var(--muted);font-size:0.9rem;line-height:1.75">Your free roll of 526N is on its way.<br>We\'ll get it shipped out to you right away.</p>'
+              + '<button class="modal-submit" style="margin-top:1.75rem;width:auto;padding:0.75rem 2rem" onclick="closeModal()">Close</button>'
+              + '</div>';
+          } else {
+            fb.style.color = '#f5a623';
+            fb.textContent = data.error || 'Something went wrong. Please try again.';
+            btn.disabled = false;
+            btn.textContent = 'Send Request';
+          }
+        })
+        .catch(function() {
           fb.style.color = '#f5a623';
-          fb.textContent = data.error || 'Something went wrong. Please try again.';
+          fb.textContent = 'Something went wrong. Please try again.';
           btn.disabled = false;
           btn.textContent = 'Send Request';
-        }
-      })
-      .catch(function() {
-        fb.style.color = '#f5a623';
-        fb.textContent = 'Something went wrong. Please try again.';
-        btn.disabled = false;
-        btn.textContent = 'Send Request';
-      });
-  });
+        });
+    });
+  }
+
+  bindForm();
 </script>
 </body>
 </html>
