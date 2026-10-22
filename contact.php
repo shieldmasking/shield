@@ -4,6 +4,7 @@ header('Content-Type: application/json');
 $name    = trim($_POST['name']    ?? '');
 $email   = trim($_POST['email']   ?? '');
 $product = trim($_POST['product'] ?? '');
+$address = trim($_POST['address'] ?? '');
 $message = trim($_POST['message'] ?? '');
 
 if (!$name || !$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -15,6 +16,7 @@ require_once __DIR__ . '/mail_config.php';
 
 $body = "Name: {$name}\r\nEmail: {$email}\r\n"
       . ($product ? "Product: {$product}\r\n" : '')
+      . ($address ? "Ship To: {$address}\r\n" : '')
       . ($message ? "\r\nMessage:\r\n{$message}" : '');
 
 $payload = json_encode([
