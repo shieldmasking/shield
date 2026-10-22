@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /inventory/
+Disallow: /shop/api/
+Disallow: /shop/cart.php
+Disallow: /shop/checkout.php
+Disallow: /shop/order-confirm.php
+
+Sitemap: https://www.shieldmasking.com/sitemap.xml
