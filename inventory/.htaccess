@@ -13,12 +13,6 @@ Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains
 Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; connect-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self';"
 Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
 
-# Secure session cookies
-php_value session.cookie_httponly 1
-php_value session.cookie_secure 1
-php_value session.cookie_samesite Strict
-php_value session.gc_maxlifetime 1800
-
 # Block direct web access to sensitive paths
 <FilesMatch "\.(env|log|sh|sql|md|example)$">
     Order allow,deny
