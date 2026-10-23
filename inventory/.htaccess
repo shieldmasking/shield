@@ -1,9 +1,6 @@
 # Custom 404
 ErrorDocument 404 /inventory/404.php
 
-# Disable directory listing
-Options -Indexes
-
 # Security headers
 Header always set X-Frame-Options "SAMEORIGIN"
 Header always set X-Content-Type-Options "nosniff"
