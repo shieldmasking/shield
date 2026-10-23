@@ -16,11 +16,6 @@ Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
     Deny from all
 </FilesMatch>
 
-# Block dangerous file types in uploads
-<FilesMatch "\.(php|phtml|php3|php4|php5|phar|exe|sh|bat|cmd)$">
-    Order allow,deny
-    Deny from all
-</FilesMatch>
 
 <IfModule mod_rewrite.c>
     RewriteRule ^inc/ - [F,L]
