@@ -25,8 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Handle datasheet upload
         $datasheet_path = null;
         if (!empty($_FILES['datasheet']['tmp_name'])) {
-            $ext = strtolower(pathinfo($_FILES['datasheet']['name'], PATHINFO_EXTENSION));
-            if ($ext === 'pdf' && $_FILES['datasheet']['size'] <= 10 * 1024 * 1024) {
+            $ext  = strtolower(pathinfo($_FILES['datasheet']['name'], PATHINFO_EXTENSION));
+            $mime = mime_content_type($_FILES['datasheet']['tmp_name']);
+            if ($ext === 'pdf' && $mime === 'application/pdf' && $_FILES['datasheet']['size'] <= 10 * 1024 * 1024) {
                 $dir = __DIR__ . '/../../uploads/datasheets/';
                 if (!is_dir($dir)) mkdir($dir, 0755, true);
                 $dest = $dir . $base_sku . '.pdf';

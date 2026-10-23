@@ -54,12 +54,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['cost_sheet'])) {
     $tmp = $_FILES['cost_sheet']['tmp_name'] ?? '';
     $ext = strtolower(pathinfo($_FILES['cost_sheet']['name'], PATHINFO_EXTENSION));
 
-    if ($ext !== 'pdf' || empty($tmp)) {
-        $parse_error = 'Please upload a PDF file.';
+    if ($ext !== 'pdf' || empty($tmp) || mime_content_type($tmp) !== 'application/pdf') {
+        $parse_error = 'Please upload a valid PDF file.';
     } else {
-        $text = shell_exec('pdftotext -layout ' . escapeshellarg($tmp) . ' -');
-        if ($text === null || trim($text) === '') {
-            $parse_error = 'Could not extract text from PDF. Ensure pdftotext (poppler-utils) is installed on the server.';
+        try {
+            require_once __DIR__ . '/../../vendor/autoload.php';
+            $pdf  = (new \Smalot\PdfParser\Parser())->parseFile($tmp);
+            $text = $pdf->getText();
+        } catch (\Exception $e) {
+            $text = '';
+        }
+        if (trim($text) === '') {
+            $parse_error = 'Could not extract text from PDF.';
         } else {
             $raw = parse_cost_sheet($text);
             // Load current products for comparison

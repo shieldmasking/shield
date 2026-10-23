@@ -11,7 +11,40 @@ function require_login(): void {
     }
 }
 
+function check_ip_rate_limit(): bool {
+    $ip   = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $file = sys_get_temp_dir() . '/shield_ip_' . md5($ip) . '.json';
+    $now  = time();
+    $window = 3600; // 1 hour
+    $max    = 20;   // max attempts per IP per hour
+
+    $data = ['attempts' => [], 'blocked_until' => 0];
+    if (file_exists($file)) {
+        $data = json_decode(file_get_contents($file), true) ?: $data;
+    }
+
+    if ($data['blocked_until'] > $now) return false;
+
+    // Purge attempts older than window
+    $data['attempts'] = array_filter($data['attempts'], fn($t) => $t > $now - $window);
+    $data['attempts'][] = $now;
+
+    if (count($data['attempts']) > $max) {
+        $data['blocked_until'] = $now + $window;
+        $data['attempts'] = [];
+        file_put_contents($file, json_encode($data), LOCK_EX);
+        return false;
+    }
+
+    file_put_contents($file, json_encode($data), LOCK_EX);
+    return true;
+}
+
 function attempt_login(PDO $db, string $email, string $password): string {
+    if (!check_ip_rate_limit()) {
+        return 'Too many login attempts from your IP. Try again in 1 hour.';
+    }
+
     $stmt = $db->prepare('SELECT id, password_hash, failed_attempts, locked_until, force_password_change, is_admin FROM users WHERE email = ?');
     $stmt->execute([strtolower(trim($email))]);
     $user = $stmt->fetch();

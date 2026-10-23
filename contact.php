@@ -1,6 +1,25 @@
 <?php
 header('Content-Type: application/json');
 
+// Origin check — only accept submissions from our domain
+$origin  = $_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '';
+$allowed = ['https://www.shieldmasking.com', 'https://shieldmasking.com'];
+$ok_origin = false;
+foreach ($allowed as $a) {
+    if (str_starts_with($origin, $a)) { $ok_origin = true; break; }
+}
+if (!$ok_origin) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Forbidden.']);
+    exit;
+}
+
+// Honeypot — bots fill this, humans don't
+if (!empty($_POST['website'])) {
+    echo json_encode(['ok' => true]); // silently discard
+    exit;
+}
+
 $name    = trim($_POST['name']    ?? '');
 $email   = trim($_POST['email']   ?? '');
 $product = trim($_POST['product'] ?? '');

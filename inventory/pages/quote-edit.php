@@ -78,8 +78,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'approve' && $is_approvable) {
         $po_path = null;
         if (!empty($_FILES['po_pdf']['tmp_name'])) {
-            $ext = strtolower(pathinfo($_FILES['po_pdf']['name'], PATHINFO_EXTENSION));
-            if ($ext !== 'pdf') {
+            $ext  = strtolower(pathinfo($_FILES['po_pdf']['name'], PATHINFO_EXTENSION));
+            $mime = mime_content_type($_FILES['po_pdf']['tmp_name']);
+            if ($ext !== 'pdf' || $mime !== 'application/pdf') {
                 $errors[] = 'PO attachment must be a PDF file.';
             } elseif ($_FILES['po_pdf']['size'] > 10 * 1024 * 1024) {
                 $errors[] = 'PO file exceeds 10MB limit.';
