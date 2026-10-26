@@ -92,9 +92,14 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
         $input['spray_types']   = array_values(array_intersect($_POST['spray_types']   ?? [], $spray_options));
         $input['mask_products'] = array_values(array_intersect($_POST['mask_products'] ?? [], $mask_options));
         $input['tape_sizes']    = array_values(array_intersect($_POST['tape_sizes']    ?? [], $tape_size_options));
-        $other_text = trim($_POST['tape_sizes_other'] ?? '');
-        if (in_array('Other', $input['tape_sizes']) && $other_text !== '') {
-            $input['tape_sizes'] = array_map(fn($v) => $v === 'Other' ? "Other: {$other_text}" : $v, $input['tape_sizes']);
+
+        foreach ([
+            ['spray_types',   'spray_types_other'],
+            ['mask_products', 'mask_products_other'],
+            ['tape_sizes',    'tape_sizes_other'],
+        ] as [$field, $other_key]) {
+            $other_text = trim($_POST[$other_key] ?? '');
+            if (!empty($other_text)) $input[$field][] = "Other: {$other_text}";
         }
         $input['tape_usage']    = $_POST['tape_usage'] ?? '';
 
@@ -252,6 +257,16 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
                 <label class="form-check-label" for="spray_<?= h(str_replace(' ', '_', $opt)) ?>"><?= h($opt) ?></label>
             </div>
             <?php endforeach; ?>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="spray_Other"
+                       onchange="document.getElementById('spray_other_text').style.display=this.checked?'block':'none'"
+                       <?= !empty($_POST['spray_types_other'] ?? '') ? 'checked' : '' ?>>
+                <label class="form-check-label" for="spray_Other">Other</label>
+                <input type="text" name="spray_types_other" id="spray_other_text" class="form-control form-control-sm mt-1"
+                       placeholder="Specify process(es)"
+                       style="display:<?= !empty($_POST['spray_types_other'] ?? '') ? 'block' : 'none' ?>"
+                       value="<?= h($_POST['spray_types_other'] ?? '') ?>">
+            </div>
             <?php if (isset($errors['spray_types'])): ?>
                 <div class="text-danger small mt-1"><?= h($errors['spray_types']) ?></div>
             <?php endif; ?>
@@ -267,6 +282,16 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
                 <label class="form-check-label" for="mask_<?= h(str_replace(' ', '_', $opt)) ?>"><?= h($opt) ?></label>
             </div>
             <?php endforeach; ?>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="mask_Other"
+                       onchange="document.getElementById('mask_other_text').style.display=this.checked?'block':'none'"
+                       <?= !empty($_POST['mask_products_other'] ?? '') ? 'checked' : '' ?>>
+                <label class="form-check-label" for="mask_Other">Other</label>
+                <input type="text" name="mask_products_other" id="mask_other_text" class="form-control form-control-sm mt-1"
+                       placeholder="Specify product(s)"
+                       style="display:<?= !empty($_POST['mask_products_other'] ?? '') ? 'block' : 'none' ?>"
+                       value="<?= h($_POST['mask_products_other'] ?? '') ?>">
+            </div>
             <?php if (isset($errors['mask_products'])): ?>
                 <div class="text-danger small mt-1"><?= h($errors['mask_products']) ?></div>
             <?php endif; ?>
