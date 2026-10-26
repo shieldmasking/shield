@@ -6,6 +6,21 @@ require_once __DIR__ . '/../../inc/layout.php';
 require_once __DIR__ . '/../../../mail_config.php';
 require_login();
 
+db()->exec("CREATE TABLE IF NOT EXISTS leads (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    token         VARCHAR(64)  NOT NULL UNIQUE,
+    company       VARCHAR(255) NOT NULL,
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
+    spray_types   TEXT         NULL,
+    mask_products TEXT         NULL,
+    tape_usage    ENUM('high','med','low') NULL,
+    tape_sizes    TEXT         NULL,
+    promo_code    VARCHAR(20)  NULL,
+    status        ENUM('invited','completed') NOT NULL DEFAULT 'invited',
+    created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 function resend_invite(array $payload): bool {
     $ch = curl_init('https://api.resend.com/emails');
     curl_setopt_array($ch, [
@@ -37,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!filter_var($input['email'], FILTER_VALIDATE_EMAIL))        $errors['email']   = 'Valid email required.';
 
     if (empty($errors)) {
+        try {
         $token = bin2hex(random_bytes(32));
         $link  = 'https://shieldmasking.com/prospect.php?t=' . $token;
 
@@ -66,6 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $sent = true;
         $input = ['company' => '', 'name' => '', 'email' => ''];
+        } catch (Throwable $e) {
+            $errors['_'] = 'Error: ' . $e->getMessage();
+        }
     }
 }
 
@@ -82,6 +101,9 @@ render_header('Send Prospect Form', 'admin');
 
 <?php if ($sent): ?>
     <div class="alert alert-success">Invite sent to <?= h($_POST['email'] ?? '') ?>.</div>
+<?php endif; ?>
+<?php if (isset($errors['_'])): ?>
+    <div class="alert alert-danger"><?= h($errors['_']) ?></div>
 <?php endif; ?>
 
 <div class="card mb-5" style="max-width:500px">
