@@ -50,7 +50,7 @@ function h(string $s): string {
 leads_ensure_table();
 
 $spray_options = ['HVOF', 'Plasma', 'Arc Wire', 'Flame Spray', 'Cold Spray', 'HVAF'];
-$mask_options  = ['Tape', 'MachBloc', '2-Part Putty'];
+$mask_options  = ['Single-Sided Tape', 'Double-Sided Tape', 'MachBloc', '2-Part Putty'];
 $usage_options = [
     'high' => 'High — over 100 rolls/mo',
     'med'  => 'Medium — 20–100 rolls/mo',
