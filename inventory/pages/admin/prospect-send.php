@@ -6,10 +6,6 @@ require_once __DIR__ . '/../../inc/layout.php';
 require_once __DIR__ . '/../../../mail_config.php';
 require_login();
 
-function h(string $s): string {
-    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-}
-
 function resend_invite(array $payload): bool {
     $ch = curl_init('https://api.resend.com/emails');
     curl_setopt_array($ch, [
