@@ -63,7 +63,7 @@ leads_ensure_table();
 
 $spray_options     = ['HVOF', 'Plasma', 'Arc Wire', 'Flame Spray', 'Cold Spray', 'HVAF'];
 $mask_options      = ['Single-Sided Tape', 'Double-Sided Tape', 'MachBloc', '2-Part Putty'];
-$tape_size_options = ['0.5"', '1"', '1.5"', '2"', '2.5"', '3"', '3.5"', '4"', '4.5"', '5"', '5.5"', '6"', 'Other'];
+$tape_size_options = ['0.5"', '1"', '1.5"', '2"', '2.5"', '3"', '3.5"', '4"', '4.5"', '5"', '5.5"', '6"'];
 $usage_options = [
     'high' => 'High — over 100 rolls/mo',
     'med'  => 'Medium — 20–100 rolls/mo',
