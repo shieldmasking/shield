@@ -63,7 +63,7 @@ leads_ensure_table();
 
 $spray_options     = ['HVOF', 'Plasma', 'Arc Wire', 'Flame Spray', 'Cold Spray', 'HVAF'];
 $mask_options      = ['Single-Sided Tape', 'Double-Sided Tape', 'MachBloc', '2-Part Putty'];
-$tape_size_options = ['0.5"', '1"', '1.5"', '2"', '2.5"', '3"', '3.5"', '4"', '4.5"', '5"', '5.5"', '6"'];
+$tape_size_options = ['0.5"', '1"', '1.5"', '2"', '2.5"', '3"', '3.5"', '4"', '4.5"', '5"', '5.5"', '6"', 'Other'];
 $usage_options = [
     'high' => 'High — over 100 rolls/mo',
     'med'  => 'Medium — 20–100 rolls/mo',
@@ -92,6 +92,10 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
         $input['spray_types']   = array_values(array_intersect($_POST['spray_types']   ?? [], $spray_options));
         $input['mask_products'] = array_values(array_intersect($_POST['mask_products'] ?? [], $mask_options));
         $input['tape_sizes']    = array_values(array_intersect($_POST['tape_sizes']    ?? [], $tape_size_options));
+        $other_text = trim($_POST['tape_sizes_other'] ?? '');
+        if (in_array('Other', $input['tape_sizes']) && $other_text !== '') {
+            $input['tape_sizes'] = array_map(fn($v) => $v === 'Other' ? "Other: {$other_text}" : $v, $input['tape_sizes']);
+        }
         $input['tape_usage']    = $_POST['tape_usage'] ?? '';
 
         if (empty($input['spray_types']))                             $errors['spray_types']   = 'Select at least one.';
@@ -281,6 +285,16 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
                     </div>
                 </div>
             <?php endforeach; ?>
+            </div>
+            <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="tape_sizes[]" value="Other" id="tsize_Other"
+                       <?= in_array('Other', $input['tape_sizes']) ? 'checked' : '' ?>
+                       onchange="document.getElementById('tsize_other_text').style.display=this.checked?'block':'none'">
+                <label class="form-check-label" for="tsize_Other">Other</label>
+                <input type="text" name="tape_sizes_other" id="tsize_other_text" class="form-control form-control-sm mt-1"
+                       placeholder="Specify size(s)"
+                       style="display:<?= in_array('Other', $input['tape_sizes']) ? 'block' : 'none' ?>"
+                       value="<?= h($_POST['tape_sizes_other'] ?? '') ?>">
             </div>
             <?php if (isset($errors['tape_sizes'])): ?>
                 <div class="text-danger small mt-1"><?= h($errors['tape_sizes']) ?></div>
