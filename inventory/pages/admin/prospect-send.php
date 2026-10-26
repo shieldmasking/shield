@@ -177,7 +177,24 @@ render_header('Send Prospect Form', 'admin');
     <tbody>
     <?php foreach ($leads as $row): ?>
         <tr>
-            <td><?= h($row['company']) ?></td>
+            <td>
+                <?php if ($row['status'] === 'completed'): ?>
+                <a href="#" class="lead-detail-link"
+                   data-company="<?= h($row['company']) ?>"
+                   data-name="<?= h($row['name']) ?>"
+                   data-email="<?= h($row['email']) ?>"
+                   data-spray="<?= h($row['spray_types'] ?? '') ?>"
+                   data-mask="<?= h($row['mask_products'] ?? '') ?>"
+                   data-sizes="<?= h($row['tape_sizes'] ?? '') ?>"
+                   data-usage="<?= h($row['tape_usage'] ?? '') ?>"
+                   data-promo="<?= h($row['promo_code'] ?? '') ?>"
+                   data-bs-toggle="modal" data-bs-target="#leadModal">
+                    <?= h($row['company']) ?>
+                </a>
+                <?php else: ?>
+                    <?= h($row['company']) ?>
+                <?php endif; ?>
+            </td>
             <td><?= h($row['name']) ?></td>
             <td><?= h($row['email']) ?></td>
             <td>
@@ -201,5 +218,47 @@ render_header('Send Prospect Form', 'admin');
     </tbody>
 </table>
 <?php endif; ?>
+
+<div class="modal fade" id="leadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="leadModalTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0" id="leadModalBody"></dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.lead-detail-link').forEach(function(el) {
+    el.addEventListener('click', function() {
+        var d = this.dataset;
+        document.getElementById('leadModalTitle').textContent = d.company;
+
+        function parseList(json) {
+            try { var a = JSON.parse(json); return a.length ? a.join(', ') : '—'; }
+            catch(e) { return json || '—'; }
+        }
+
+        var rows = [
+            ['Name',             d.name],
+            ['Email',            d.email],
+            ['Spray Processes',  parseList(d.spray)],
+            ['Masking Products', parseList(d.mask)],
+            ['Tape Sizes',       parseList(d.sizes)],
+            ['Tape Usage',       d.usage || '—'],
+            ['Promo Code',       d.promo || '—'],
+        ];
+
+        document.getElementById('leadModalBody').innerHTML = rows.map(function(r) {
+            return '<dt class="col-sm-5">' + r[0] + '</dt><dd class="col-sm-7">' + r[1] + '</dd>';
+        }).join('');
+    });
+});
+</script>
 
 <?php render_footer(); ?>
