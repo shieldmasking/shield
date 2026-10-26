@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/inventory/inc/db.php';
 require_once __DIR__ . '/mail_config.php';
 
@@ -8,8 +11,8 @@ function leads_ensure_table(): void {
         company       VARCHAR(255) NOT NULL,
         name          VARCHAR(255) NOT NULL,
         email         VARCHAR(255) NOT NULL,
-        spray_types   JSON         NOT NULL,
-        mask_products JSON         NOT NULL,
+        spray_types   TEXT         NOT NULL,
+        mask_products TEXT         NOT NULL,
         tape_usage    ENUM('high','med','low') NOT NULL,
         promo_code    VARCHAR(20)  NOT NULL,
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP
