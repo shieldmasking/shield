@@ -178,11 +178,11 @@ render_header('Send Prospect Form', 'admin');
     <?php foreach ($leads as $row): ?>
         <tr>
             <td>
-                <?php if ($row['status'] === 'completed'): ?>
                 <a href="#" class="lead-detail-link"
                    data-company="<?= h($row['company']) ?>"
                    data-name="<?= h($row['name']) ?>"
                    data-email="<?= h($row['email']) ?>"
+                   data-status="<?= h($row['status']) ?>"
                    data-spray="<?= h($row['spray_types'] ?? '') ?>"
                    data-mask="<?= h($row['mask_products'] ?? '') ?>"
                    data-sizes="<?= h($row['tape_sizes'] ?? '') ?>"
@@ -191,9 +191,6 @@ render_header('Send Prospect Form', 'admin');
                    data-bs-toggle="modal" data-bs-target="#leadModal">
                     <?= h($row['company']) ?>
                 </a>
-                <?php else: ?>
-                    <?= h($row['company']) ?>
-                <?php endif; ?>
             </td>
             <td><?= h($row['name']) ?></td>
             <td><?= h($row['email']) ?></td>
@@ -244,15 +241,18 @@ document.querySelectorAll('.lead-detail-link').forEach(function(el) {
             catch(e) { return json || '—'; }
         }
 
-        var rows = [
-            ['Name',             d.name],
-            ['Email',            d.email],
-            ['Spray Processes',  parseList(d.spray)],
-            ['Masking Products', parseList(d.mask)],
-            ['Tape Sizes',       parseList(d.sizes)],
-            ['Tape Usage',       d.usage || '—'],
-            ['Promo Code',       d.promo || '—'],
-        ];
+        var rows = [['Name', d.name], ['Email', d.email]];
+        if (d.status === 'completed') {
+            rows = rows.concat([
+                ['Spray Processes',  parseList(d.spray)],
+                ['Masking Products', parseList(d.mask)],
+                ['Tape Sizes',       parseList(d.sizes)],
+                ['Tape Usage',       d.usage || '—'],
+                ['Promo Code',       d.promo || '—'],
+            ]);
+        } else {
+            rows.push(['Status', 'Invite sent — not yet completed']);
+        }
 
         document.getElementById('leadModalBody').innerHTML = rows.map(function(r) {
             return '<dt class="col-sm-5">' + r[0] + '</dt><dd class="col-sm-7">' + r[1] + '</dd>';
