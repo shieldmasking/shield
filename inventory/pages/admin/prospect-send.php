@@ -241,18 +241,15 @@ document.querySelectorAll('.lead-detail-link').forEach(function(el) {
             catch(e) { return json || '—'; }
         }
 
-        var rows = [['Name', d.name], ['Email', d.email]];
-        if (d.status === 'completed') {
-            rows = rows.concat([
-                ['Spray Processes',  parseList(d.spray)],
-                ['Masking Products', parseList(d.mask)],
-                ['Tape Sizes',       parseList(d.sizes)],
-                ['Tape Usage',       d.usage || '—'],
-                ['Promo Code',       d.promo || '—'],
-            ]);
-        } else {
-            rows.push(['Status', 'Invite sent — not yet completed']);
-        }
+        var rows = [
+            ['Name',             d.name],
+            ['Email',            d.email],
+            ['Spray Processes',  parseList(d.spray)],
+            ['Masking Products', parseList(d.mask)],
+            ['Tape Sizes',       parseList(d.sizes)],
+            ['Tape Usage',       d.usage || '—'],
+            ['Promo Code',       d.promo || '—'],
+        ];
 
         document.getElementById('leadModalBody').innerHTML = rows.map(function(r) {
             return '<dt class="col-sm-5">' + r[0] + '</dt><dd class="col-sm-7">' + r[1] + '</dd>';
