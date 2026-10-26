@@ -1,22 +1,32 @@
 <?php
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
-
 require_once __DIR__ . '/inventory/inc/db.php';
 require_once __DIR__ . '/mail_config.php';
 
 function leads_ensure_table(): void {
     db()->exec("CREATE TABLE IF NOT EXISTS leads (
         id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        token         VARCHAR(64)  NOT NULL UNIQUE,
         company       VARCHAR(255) NOT NULL,
         name          VARCHAR(255) NOT NULL,
         email         VARCHAR(255) NOT NULL,
-        spray_types   TEXT         NOT NULL,
-        mask_products TEXT         NOT NULL,
-        tape_usage    ENUM('high','med','low') NOT NULL,
-        promo_code    VARCHAR(20)  NOT NULL,
+        spray_types   TEXT         NULL,
+        mask_products TEXT         NULL,
+        tape_usage    ENUM('high','med','low') NULL,
+        promo_code    VARCHAR(20)  NULL,
+        status        ENUM('invited','completed') NOT NULL DEFAULT 'invited',
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Migrate existing table if needed
+    try {
+        db()->exec("ALTER TABLE leads
+            ADD COLUMN token   VARCHAR(64) NULL UNIQUE AFTER id,
+            ADD COLUMN status  ENUM('invited','completed') NOT NULL DEFAULT 'invited' AFTER promo_code,
+            MODIFY spray_types   TEXT NULL,
+            MODIFY mask_products TEXT NULL,
+            MODIFY tape_usage    ENUM('high','med','low') NULL,
+            MODIFY promo_code    VARCHAR(20) NULL");
+    } catch (PDOException) {}
 }
 
 function generate_promo(): string {
@@ -57,50 +67,45 @@ $usage_options = [
     'low'  => 'Low — under 20 rolls/mo',
 ];
 
+// Load lead by token
+$token = trim($_GET['t'] ?? '');
+$lead  = null;
+
+if ($token !== '') {
+    $stmt = db()->prepare("SELECT * FROM leads WHERE token = ?");
+    $stmt->execute([$token]);
+    $lead = $stmt->fetch() ?: null;
+}
+
 $errors  = [];
 $success = false;
 $promo   = '';
-$input   = [
-    'company'       => '',
-    'name'          => '',
-    'email'         => '',
-    'spray_types'   => [],
-    'mask_products' => [],
-    'tape_usage'    => '',
-];
+$input   = ['spray_types' => [], 'mask_products' => [], 'tape_usage' => ''];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['website'])) {
-        $success = true; // honeypot — silently discard
+        $success = true;
     } else {
-        $input['company']       = trim($_POST['company']    ?? '');
-        $input['name']          = trim($_POST['name']       ?? '');
-        $input['email']         = trim($_POST['email']      ?? '');
         $input['spray_types']   = array_values(array_intersect($_POST['spray_types']   ?? [], $spray_options));
         $input['mask_products'] = array_values(array_intersect($_POST['mask_products'] ?? [], $mask_options));
         $input['tape_usage']    = $_POST['tape_usage'] ?? '';
 
-        if ($input['company'] === '')                                      $errors['company']       = 'Required.';
-        if ($input['name']    === '')                                      $errors['name']          = 'Required.';
-        if (!filter_var($input['email'], FILTER_VALIDATE_EMAIL))           $errors['email']         = 'Valid email required.';
-        if (empty($input['spray_types']))                                  $errors['spray_types']   = 'Select at least one.';
-        if (empty($input['mask_products']))                                $errors['mask_products'] = 'Select at least one.';
-        if (!array_key_exists($input['tape_usage'], $usage_options))      $errors['tape_usage']    = 'Select one.';
+        if (empty($input['spray_types']))                             $errors['spray_types']   = 'Select at least one.';
+        if (empty($input['mask_products']))                           $errors['mask_products'] = 'Select at least one.';
+        if (!array_key_exists($input['tape_usage'], $usage_options)) $errors['tape_usage']    = 'Select one.';
 
         if (empty($errors)) {
             $promo = generate_promo();
 
             db()->prepare("
-                INSERT INTO leads (company, name, email, spray_types, mask_products, tape_usage, promo_code)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                UPDATE leads SET spray_types=?, mask_products=?, tape_usage=?, promo_code=?, status='completed'
+                WHERE token=?
             ")->execute([
-                $input['company'],
-                $input['name'],
-                $input['email'],
                 json_encode($input['spray_types']),
                 json_encode($input['mask_products']),
                 $input['tape_usage'],
                 $promo,
+                $token,
             ]);
 
             $spray_list  = implode(', ', $input['spray_types']);
@@ -110,11 +115,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             resend([
                 'from'    => 'Shield Masking <noreply@shieldmasking.com>',
                 'to'      => ['rstrenger@shieldmasking.com'],
-                'subject' => "New Prospect: {$input['company']}",
+                'subject' => "Prospect Form Completed: {$lead['company']}",
                 'text'    => implode("\n", [
-                    "Company:          {$input['company']}",
-                    "Name:             {$input['name']}",
-                    "Email:            {$input['email']}",
+                    "Company:          {$lead['company']}",
+                    "Name:             {$lead['name']}",
+                    "Email:            {$lead['email']}",
                     "",
                     "Spray Processes:  {$spray_list}",
                     "Masking Products: {$mask_list}",
@@ -126,12 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             resend([
                 'from'    => 'Shield Masking <noreply@shieldmasking.com>',
-                'to'      => [$input['email']],
+                'to'      => [$lead['email']],
                 'subject' => 'Your 10% Discount Code — Shield Masking',
                 'text'    => implode("\n", [
-                    "Hi {$input['name']},",
+                    "Hi {$lead['name']},",
                     "",
-                    "Thank you for your interest in Shield Masking! Here is your 10% discount code for your first order:",
+                    "Thank you for completing our form! Here is your 10% discount code for your first order:",
                     "",
                     "    {$promo}",
                     "",
@@ -170,12 +175,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="container pb-5" style="max-width:600px;">
 
-<?php if ($success): ?>
+<?php if (!$lead): ?>
+
+    <div class="text-center py-5">
+        <h4 class="text-muted">Invalid or expired link.</h4>
+        <p>Please contact us at <a href="mailto:rstrenger@shieldmasking.com">rstrenger@shieldmasking.com</a> for a new link.</p>
+    </div>
+
+<?php elseif ($lead['status'] === 'completed' && !$success): ?>
+
+    <div class="text-center py-5">
+        <h4>Already submitted</h4>
+        <p class="text-muted">This form has already been completed. Check your email for your discount code.</p>
+    </div>
+
+<?php elseif ($success): ?>
 
     <div class="text-center py-4">
         <h2 class="fw-bold mb-3">You're all set!</h2>
         <p class="lead mb-1">Your discount code has been sent to</p>
-        <p class="fw-semibold mb-4"><?= h($input['email']) ?></p>
+        <p class="fw-semibold mb-4"><?= h($lead['email']) ?></p>
         <?php if ($promo): ?>
         <div class="card border-success mb-4">
             <div class="card-body py-4">
@@ -193,34 +212,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h1 class="fw-bold mb-1">Get 10% Off Your First Order</h1>
     <p class="text-muted mb-4">Tell us about your operation and we'll send your discount code right away.</p>
 
-    <form method="post" novalidate>
+    <form method="post" action="?t=<?= h($token) ?>" novalidate>
         <input type="text" name="website" style="display:none" tabindex="-1" autocomplete="off">
 
         <div class="mb-3">
-            <label class="form-label fw-semibold">Company <span class="text-danger">*</span></label>
-            <input type="text" name="company" class="form-control<?= isset($errors['company']) ? ' is-invalid' : '' ?>"
-                   value="<?= h($input['company']) ?>">
-            <?php if (isset($errors['company'])): ?>
-                <div class="invalid-feedback"><?= h($errors['company']) ?></div>
-            <?php endif; ?>
+            <label class="form-label fw-semibold">Company</label>
+            <input type="text" class="form-control bg-light" value="<?= h($lead['company']) ?>" disabled>
         </div>
 
         <div class="mb-3">
-            <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
-            <input type="text" name="name" class="form-control<?= isset($errors['name']) ? ' is-invalid' : '' ?>"
-                   value="<?= h($input['name']) ?>">
-            <?php if (isset($errors['name'])): ?>
-                <div class="invalid-feedback"><?= h($errors['name']) ?></div>
-            <?php endif; ?>
+            <label class="form-label fw-semibold">Name</label>
+            <input type="text" class="form-control bg-light" value="<?= h($lead['name']) ?>" disabled>
         </div>
 
         <div class="mb-3">
-            <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
-            <input type="email" name="email" class="form-control<?= isset($errors['email']) ? ' is-invalid' : '' ?>"
-                   value="<?= h($input['email']) ?>">
-            <?php if (isset($errors['email'])): ?>
-                <div class="invalid-feedback"><?= h($errors['email']) ?></div>
-            <?php endif; ?>
+            <label class="form-label fw-semibold">Email</label>
+            <input type="email" class="form-control bg-light" value="<?= h($lead['email']) ?>" disabled>
         </div>
 
         <div class="mb-3">
