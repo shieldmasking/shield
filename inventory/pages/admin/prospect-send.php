@@ -13,7 +13,7 @@ foreach ([
     "ALTER TABLE leads ADD COLUMN status     ENUM('invited','completed') NOT NULL DEFAULT 'invited'",
     "ALTER TABLE leads MODIFY spray_types    TEXT NULL",
     "ALTER TABLE leads MODIFY mask_products  TEXT NULL",
-    "ALTER TABLE leads MODIFY tape_usage     ENUM('high','med','low') NULL",
+    "ALTER TABLE leads MODIFY tape_usage     VARCHAR(255) NULL",
     "ALTER TABLE leads MODIFY promo_code     VARCHAR(20)  NULL",
 ] as $sql) { try { db()->exec($sql); } catch (PDOException) {} }
 

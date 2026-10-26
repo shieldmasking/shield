@@ -11,7 +11,7 @@ function leads_ensure_table(): void {
         email         VARCHAR(255) NOT NULL,
         spray_types   TEXT         NULL,
         mask_products TEXT         NULL,
-        tape_usage    ENUM('high','med','low') NULL,
+        tape_usage    VARCHAR(255) NULL,
         tape_sizes    TEXT         NULL,
         promo_code    VARCHAR(20)  NULL,
         status        ENUM('invited','completed') NOT NULL DEFAULT 'invited',
@@ -29,6 +29,7 @@ function leads_ensure_table(): void {
             MODIFY promo_code    VARCHAR(20) NULL");
     } catch (PDOException) {}
     try { db()->exec("ALTER TABLE leads ADD COLUMN tape_sizes TEXT NULL AFTER tape_usage"); } catch (PDOException) {}
+    try { db()->exec("ALTER TABLE leads MODIFY tape_usage VARCHAR(255) NULL"); } catch (PDOException) {}
 }
 
 function generate_promo(): string {
@@ -101,12 +102,16 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
             $other_text = trim($_POST[$other_key] ?? '');
             if (!empty($other_text)) $input[$field][] = "Other: {$other_text}";
         }
-        $input['tape_usage']    = $_POST['tape_usage'] ?? '';
+        $input['tape_usage'] = $_POST['tape_usage'] ?? '';
+        if ($input['tape_usage'] === 'other') {
+            $other_text = trim($_POST['tape_usage_other'] ?? '');
+            $input['tape_usage'] = $other_text !== '' ? "Other: {$other_text}" : '';
+        }
 
-        if (empty($input['spray_types']))                             $errors['spray_types']   = 'Select at least one.';
-        if (empty($input['mask_products']))                           $errors['mask_products'] = 'Select at least one.';
-        if (empty($input['tape_sizes']))                              $errors['tape_sizes']    = 'Select at least one.';
-        if (!array_key_exists($input['tape_usage'], $usage_options)) $errors['tape_usage']    = 'Select one.';
+        if (empty($input['spray_types']))                                                          $errors['spray_types']   = 'Select at least one.';
+        if (empty($input['mask_products']))                                                        $errors['mask_products'] = 'Select at least one.';
+        if (empty($input['tape_sizes']))                                                           $errors['tape_sizes']    = 'Select at least one.';
+        if (!array_key_exists($input['tape_usage'], $usage_options) && !str_starts_with($input['tape_usage'], 'Other:')) $errors['tape_usage'] = 'Select one.';
 
         if (empty($errors)) {
             $promo = generate_promo();
@@ -336,6 +341,16 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
                 <label class="form-check-label" for="usage_<?= h($val) ?>"><?= h($label) ?></label>
             </div>
             <?php endforeach; ?>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="tape_usage" value="other" id="usage_other"
+                       <?= $input['tape_usage'] === 'other' || str_starts_with($input['tape_usage'], 'Other:') ? 'checked' : '' ?>
+                       onchange="document.getElementById('usage_other_text').style.display=this.checked?'block':'none'">
+                <label class="form-check-label" for="usage_other">Other</label>
+                <input type="text" name="tape_usage_other" id="usage_other_text" class="form-control form-control-sm mt-1"
+                       placeholder="Describe usage"
+                       style="display:<?= str_starts_with($input['tape_usage'], 'Other:') ? 'block' : 'none' ?>"
+                       value="<?= h(str_starts_with($input['tape_usage'], 'Other:') ? substr($input['tape_usage'], 7) : ($_POST['tape_usage_other'] ?? '')) ?>">
+            </div>
             <?php if (isset($errors['tape_usage'])): ?>
                 <div class="text-danger small mt-1"><?= h($errors['tape_usage']) ?></div>
             <?php endif; ?>
