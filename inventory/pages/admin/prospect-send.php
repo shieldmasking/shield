@@ -6,6 +6,17 @@ require_once __DIR__ . '/../../inc/layout.php';
 require_once __DIR__ . '/../../../mail_config.php';
 require_login();
 
+// Migrate old table if columns are missing
+foreach ([
+    "ALTER TABLE leads ADD COLUMN token      VARCHAR(64)  NULL UNIQUE",
+    "ALTER TABLE leads ADD COLUMN tape_sizes TEXT         NULL",
+    "ALTER TABLE leads ADD COLUMN status     ENUM('invited','completed') NOT NULL DEFAULT 'invited'",
+    "ALTER TABLE leads MODIFY spray_types    TEXT NULL",
+    "ALTER TABLE leads MODIFY mask_products  TEXT NULL",
+    "ALTER TABLE leads MODIFY tape_usage     ENUM('high','med','low') NULL",
+    "ALTER TABLE leads MODIFY promo_code     VARCHAR(20)  NULL",
+] as $sql) { try { db()->exec($sql); } catch (PDOException) {} }
+
 db()->exec("CREATE TABLE IF NOT EXISTS leads (
     id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     token         VARCHAR(64)  NOT NULL UNIQUE,
