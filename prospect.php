@@ -12,6 +12,7 @@ function leads_ensure_table(): void {
         spray_types   TEXT         NULL,
         mask_products TEXT         NULL,
         tape_usage    ENUM('high','med','low') NULL,
+        tape_sizes    TEXT         NULL,
         promo_code    VARCHAR(20)  NULL,
         status        ENUM('invited','completed') NOT NULL DEFAULT 'invited',
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP
@@ -27,6 +28,7 @@ function leads_ensure_table(): void {
             MODIFY tape_usage    ENUM('high','med','low') NULL,
             MODIFY promo_code    VARCHAR(20) NULL");
     } catch (PDOException) {}
+    try { db()->exec("ALTER TABLE leads ADD COLUMN tape_sizes TEXT NULL AFTER tape_usage"); } catch (PDOException) {}
 }
 
 function generate_promo(): string {
@@ -59,8 +61,9 @@ function h(string $s): string {
 
 leads_ensure_table();
 
-$spray_options = ['HVOF', 'Plasma', 'Arc Wire', 'Flame Spray', 'Cold Spray', 'HVAF'];
-$mask_options  = ['Single-Sided Tape', 'Double-Sided Tape', 'MachBloc', '2-Part Putty'];
+$spray_options     = ['HVOF', 'Plasma', 'Arc Wire', 'Flame Spray', 'Cold Spray', 'HVAF'];
+$mask_options      = ['Single-Sided Tape', 'Double-Sided Tape', 'MachBloc', '2-Part Putty'];
+$tape_size_options = ['0.5"', '1"', '1.5"', '2"', '2.5"', '3"', '3.5"', '4"', '4.5"', '5"', '5.5"', '6"'];
 $usage_options = [
     'high' => 'High — over 100 rolls/mo',
     'med'  => 'Medium — 20–100 rolls/mo',
@@ -80,7 +83,7 @@ if ($token !== '') {
 $errors  = [];
 $success = false;
 $promo   = '';
-$input   = ['spray_types' => [], 'mask_products' => [], 'tape_usage' => ''];
+$input   = ['spray_types' => [], 'mask_products' => [], 'tape_sizes' => [], 'tape_usage' => ''];
 
 if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['website'])) {
@@ -88,21 +91,24 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
     } else {
         $input['spray_types']   = array_values(array_intersect($_POST['spray_types']   ?? [], $spray_options));
         $input['mask_products'] = array_values(array_intersect($_POST['mask_products'] ?? [], $mask_options));
+        $input['tape_sizes']    = array_values(array_intersect($_POST['tape_sizes']    ?? [], $tape_size_options));
         $input['tape_usage']    = $_POST['tape_usage'] ?? '';
 
         if (empty($input['spray_types']))                             $errors['spray_types']   = 'Select at least one.';
         if (empty($input['mask_products']))                           $errors['mask_products'] = 'Select at least one.';
+        if (empty($input['tape_sizes']))                              $errors['tape_sizes']    = 'Select at least one.';
         if (!array_key_exists($input['tape_usage'], $usage_options)) $errors['tape_usage']    = 'Select one.';
 
         if (empty($errors)) {
             $promo = generate_promo();
 
             db()->prepare("
-                UPDATE leads SET spray_types=?, mask_products=?, tape_usage=?, promo_code=?, status='completed'
+                UPDATE leads SET spray_types=?, mask_products=?, tape_sizes=?, tape_usage=?, promo_code=?, status='completed'
                 WHERE token=?
             ")->execute([
                 json_encode($input['spray_types']),
                 json_encode($input['mask_products']),
+                json_encode($input['tape_sizes']),
                 $input['tape_usage'],
                 $promo,
                 $token,
@@ -110,6 +116,7 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
 
             $spray_list  = implode(', ', $input['spray_types']);
             $mask_list   = implode(', ', $input['mask_products']);
+            $sizes_list  = implode(', ', $input['tape_sizes']);
             $usage_label = $usage_options[$input['tape_usage']];
 
             resend([
@@ -123,6 +130,7 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
                     "",
                     "Spray Processes:  {$spray_list}",
                     "Masking Products: {$mask_list}",
+                    "Tape Sizes:       {$sizes_list}",
                     "Tape Usage:       {$usage_label}",
                     "",
                     "Promo Code:       {$promo}",
@@ -257,6 +265,25 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
             <?php endforeach; ?>
             <?php if (isset($errors['mask_products'])): ?>
                 <div class="text-danger small mt-1"><?= h($errors['mask_products']) ?></div>
+            <?php endif; ?>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Tape Sizes Most Often Used <span class="text-danger">*</span></label>
+            <div class="row row-cols-3 g-1">
+            <?php foreach ($tape_size_options as $opt): ?>
+                <div class="col">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="tape_sizes[]"
+                               value="<?= h($opt) ?>" id="tsize_<?= h(str_replace(['.', '"'], ['_', ''], $opt)) ?>"
+                               <?= in_array($opt, $input['tape_sizes']) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="tsize_<?= h(str_replace(['.', '"'], ['_', ''], $opt)) ?>"><?= h($opt) ?></label>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            </div>
+            <?php if (isset($errors['tape_sizes'])): ?>
+                <div class="text-danger small mt-1"><?= h($errors['tape_sizes']) ?></div>
             <?php endif; ?>
         </div>
 
