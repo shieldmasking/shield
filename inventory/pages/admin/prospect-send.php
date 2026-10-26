@@ -51,50 +51,65 @@ function resend_invite(array $payload): bool {
 
 $errors  = [];
 $sent    = false;
+$resent  = false;
 $input   = ['company' => '', 'name' => '', 'email' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action           = $_POST['action'] ?? 'send';
     $input['company'] = trim($_POST['company'] ?? '');
     $input['name']    = trim($_POST['name']    ?? '');
     $input['email']   = trim($_POST['email']   ?? '');
 
-    if ($input['company'] === '')                                   $errors['company'] = 'Required.';
-    if ($input['name']    === '')                                   $errors['name']    = 'Required.';
-    if (!filter_var($input['email'], FILTER_VALIDATE_EMAIL))        $errors['email']   = 'Valid email required.';
+    if ($action === 'delete') {
+        $del_id = (int)($_POST['id'] ?? 0);
+        if ($del_id) db()->prepare("DELETE FROM leads WHERE id = ?")->execute([$del_id]);
+    } else {
+        if ($input['company'] === '')                                $errors['company'] = 'Required.';
+        if ($input['name']    === '')                                $errors['name']    = 'Required.';
+        if (!filter_var($input['email'], FILTER_VALIDATE_EMAIL))    $errors['email']   = 'Valid email required.';
 
-    if (empty($errors)) {
-        try {
-        $token = bin2hex(random_bytes(32));
-        $link  = 'https://shieldmasking.com/prospect.php?t=' . $token;
+        if (empty($errors)) {
+            try {
+                $existing = db()->prepare("SELECT id, status FROM leads WHERE email = ? LIMIT 1");
+                $existing->execute([$input['email']]);
+                $existing = $existing->fetch();
 
-        db()->prepare("
-            INSERT INTO leads (token, company, name, email)
-            VALUES (?, ?, ?, ?)
-        ")->execute([$token, $input['company'], $input['name'], $input['email']]);
+                $token = bin2hex(random_bytes(32));
+                $link  = 'https://shieldmasking.com/prospect.php?t=' . $token;
 
-        resend_invite([
-            'from'    => 'Shield Masking <noreply@shieldmasking.com>',
-            'to'      => [$input['email']],
-            'subject' => 'Get 10% Off Your First Shield Masking Order',
-            'text'    => implode("\n", [
-                "Hi {$input['name']},",
-                "",
-                "We'd love to learn more about your operation and get you set up with the right masking solutions.",
-                "",
-                "Fill out our short form to receive 10% off your first order:",
-                "",
-                "    {$link}",
-                "",
-                "Questions? Reply to this email.",
-                "",
-                "Shield Masking Team",
-            ]),
-        ]);
+                if ($existing) {
+                    db()->prepare("UPDATE leads SET token=?, company=?, name=?, status='invited', created_at=NOW() WHERE id=?")
+                        ->execute([$token, $input['company'], $input['name'], $existing['id']]);
+                    $resent = true;
+                } else {
+                    db()->prepare("INSERT INTO leads (token, company, name, email) VALUES (?, ?, ?, ?)")
+                        ->execute([$token, $input['company'], $input['name'], $input['email']]);
+                    $sent = true;
+                }
 
-        $sent = true;
-        $input = ['company' => '', 'name' => '', 'email' => ''];
-        } catch (Throwable $e) {
-            $errors['_'] = 'Error: ' . $e->getMessage();
+                resend_invite([
+                    'from'    => 'Shield Masking <noreply@shieldmasking.com>',
+                    'to'      => [$input['email']],
+                    'subject' => 'Get 10% Off Your First Shield Masking Order',
+                    'text'    => implode("\n", [
+                        "Hi {$input['name']},",
+                        "",
+                        "We'd love to learn more about your operation and get you set up with the right masking solutions.",
+                        "",
+                        "Fill out our short form to receive 10% off your first order:",
+                        "",
+                        "    {$link}",
+                        "",
+                        "Questions? Reply to this email.",
+                        "",
+                        "Shield Masking Team",
+                    ]),
+                ]);
+
+                $input = ['company' => '', 'name' => '', 'email' => ''];
+            } catch (Throwable $e) {
+                $errors['_'] = 'Error: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -112,6 +127,8 @@ render_header('Send Prospect Form', 'admin');
 
 <?php if ($sent): ?>
     <div class="alert alert-success">Invite sent to <?= h($_POST['email'] ?? '') ?>.</div>
+<?php elseif ($resent): ?>
+    <div class="alert alert-success">Invite resent to <?= h($_POST['email'] ?? '') ?> with a new link.</div>
 <?php endif; ?>
 <?php if (isset($errors['_'])): ?>
     <div class="alert alert-danger"><?= h($errors['_']) ?></div>
@@ -154,6 +171,7 @@ render_header('Send Prospect Form', 'admin');
             <th>Status</th>
             <th>Promo Code</th>
             <th>Sent</th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -171,6 +189,13 @@ render_header('Send Prospect Form', 'admin');
             </td>
             <td><?= $row['promo_code'] ? h($row['promo_code']) : '—' ?></td>
             <td class="text-muted small"><?= h($row['created_at']) ?></td>
+            <td>
+                <form method="post" onsubmit="return confirm('Delete this invite?')">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+            </td>
         </tr>
     <?php endforeach; ?>
     </tbody>
