@@ -114,17 +114,14 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
         if (!array_key_exists($input['tape_usage'], $usage_options) && !str_starts_with($input['tape_usage'], 'Other:')) $errors['tape_usage'] = 'Select one.';
 
         if (empty($errors)) {
-            $promo = generate_promo();
-
             db()->prepare("
-                UPDATE leads SET spray_types=?, mask_products=?, tape_sizes=?, tape_usage=?, promo_code=?, status='completed'
+                UPDATE leads SET spray_types=?, mask_products=?, tape_sizes=?, tape_usage=?, status='completed'
                 WHERE token=?
             ")->execute([
                 json_encode($input['spray_types']),
                 json_encode($input['mask_products']),
                 json_encode($input['tape_sizes']),
                 $input['tape_usage'],
-                $promo,
                 $token,
             ]);
 
@@ -146,23 +143,17 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
                     "Masking Products: {$mask_list}",
                     "Tape Sizes:       {$sizes_list}",
                     "Tape Usage:       {$usage_label}",
-                    "",
-                    "Promo Code:       {$promo}",
                 ]),
             ]);
 
             resend([
                 'from'    => 'Shield Masking <noreply@shieldmasking.com>',
                 'to'      => [$lead['email']],
-                'subject' => 'Your 10% Discount Code — Shield Masking',
+                'subject' => 'Your 10% Discount — Shield Masking',
                 'text'    => implode("\n", [
                     "Hi {$lead['name']},",
                     "",
-                    "Thank you for completing our form! Here is your 10% discount code for your first order:",
-                    "",
-                    "    {$promo}",
-                    "",
-                    "Apply it at checkout at shieldmasking.com/shop/ or mention it when placing an order with our team.",
+                    "Thank you for completing our form! Your 10% discount will automatically be applied to your first order.",
                     "",
                     "Questions? Reply to this email or reach us at rstrenger@shieldmasking.com.",
                     "",
@@ -208,24 +199,15 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
 
     <div class="text-center py-5">
         <h4>Already submitted</h4>
-        <p class="text-muted">This form has already been completed. Check your email for your discount code.</p>
+        <p class="text-muted">This form has already been completed. Your 10% discount will be applied to your first order.</p>
     </div>
 
 <?php elseif ($success): ?>
 
     <div class="text-center py-4">
         <h2 class="fw-bold mb-3">You're all set!</h2>
-        <p class="lead mb-1">Your discount code has been sent to</p>
-        <p class="fw-semibold mb-4"><?= h($lead['email']) ?></p>
-        <?php if ($promo): ?>
-        <div class="card border-success mb-4">
-            <div class="card-body py-4">
-                <div class="text-muted small mb-1">YOUR 10% DISCOUNT CODE</div>
-                <div class="fs-2 fw-bold text-success"><?= h($promo) ?></div>
-            </div>
-        </div>
-        <p class="text-muted">Use at checkout or mention it when placing your order.</p>
-        <?php endif; ?>
+        <p class="lead mb-2">Your 10% discount will automatically be applied to your first order.</p>
+        <p class="text-muted">A confirmation has been sent to <strong><?= h($lead['email']) ?></strong>.</p>
         <a href="/" class="btn btn-lg mt-3 text-white" style="background:#1e2d6b;">Back to Site</a>
     </div>
 

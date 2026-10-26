@@ -169,7 +169,6 @@ render_header('Send Prospect Form', 'admin');
             <th>Name</th>
             <th>Email</th>
             <th>Status</th>
-            <th>Promo Code</th>
             <th>Sent</th>
             <th></th>
         </tr>
@@ -201,7 +200,6 @@ render_header('Send Prospect Form', 'admin');
                     <span class="badge bg-secondary">Invited</span>
                 <?php endif; ?>
             </td>
-            <td><?= $row['promo_code'] ? h($row['promo_code']) : '—' ?></td>
             <td class="text-muted small"><?= h($row['created_at']) ?></td>
             <td>
                 <form method="post" onsubmit="return confirm('Delete this invite?')">
@@ -248,7 +246,6 @@ document.querySelectorAll('.lead-detail-link').forEach(function(el) {
             ['Masking Products', parseList(d.mask)],
             ['Tape Sizes',       parseList(d.sizes)],
             ['Tape Usage',       d.usage || '—'],
-            ['Promo Code',       d.promo || '—'],
         ];
 
         document.getElementById('leadModalBody').innerHTML = rows.map(function(r) {
