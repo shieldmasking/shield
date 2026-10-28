@@ -143,6 +143,8 @@ if ($lead && $lead['status'] === 'invited' && $_SERVER['REQUEST_METHOD'] === 'PO
                     "Masking Products: {$mask_list}",
                     "Tape Sizes:       {$sizes_list}",
                     "Tape Usage:       {$usage_label}",
+                    "",
+                    "NOTE: Apply a 10% discount to this customer's first order.",
                 ]),
             ]);
 
